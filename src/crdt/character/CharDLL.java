@@ -8,10 +8,10 @@ public class CharDLL implements ICRDT {
 
     public CharDLL()
     {
-        head = new CharNode(0, 0, '\0', null);
+        head = new CharNode(0, 0, '\0', "ROOT");
         head.setNext(null);
         map = new HashMap<>();
-        map.put(null, head);
+        map.put("ROOT", head);
     }
 
     @Override
@@ -27,6 +27,10 @@ public class CharDLL implements ICRDT {
 
         while (rightNeighbour != null)
         {
+            // Edge case: Parent has no children
+            if ((rightNeighbour == parent.getNext()) && !(sameParent(rightNeighbour, c))) break;
+
+            // Normal case
             if (sameParent(rightNeighbour, c) && c.winsOver(rightNeighbour)) break;
             leftNeighbour = rightNeighbour;
             rightNeighbour = rightNeighbour.getNext();
@@ -61,8 +65,6 @@ public class CharDLL implements ICRDT {
     // Helper function for insert
     private boolean sameParent(CharNode c1, CharNode c2)
     {
-        if (c1.getParentID() == null && c2.getParentID() == null) return true;
-        if (c1.getParentID() == null || c2.getParentID() == null) return false;
         return c1.getParentID().equals(c2.getParentID());
     }
 }
