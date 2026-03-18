@@ -8,7 +8,7 @@ public class CharDLL implements ICRDT {
 
     public CharDLL()
     {
-        head = new CharNode(0, 0, '\0', "ROOT");
+        head = new CharNode(0, 0, '\0', "ROOT", false, false);
         head.setNext(null);
         map = new HashMap<>();
         map.put("ROOT", head);
@@ -16,25 +16,39 @@ public class CharDLL implements ICRDT {
 
     @Override
     public void insert(CharNode c) throws RuntimeException {
-        // Add to map
-        map.put(c.getCharID(), c);
-
         // Find parent
         CharNode parent = map.get(c.getParentID());
+
+        // Throw a runtime exception first if node is an orphan before adding to the map
+        if (parent == null) throw new RuntimeException("Parent not found: " + c.getParentID());
+
+        map.put(c.getCharID(), c);
+        int targetDepth = parent.getDepth() + 1;
+        c.setDepth(targetDepth);
 
         CharNode rightNeighbour = parent.getNext();
         CharNode leftNeighbour = parent;
 
         while (rightNeighbour != null)
         {
-            // Edge case: Parent has no children
-            if ((rightNeighbour == parent.getNext()) && !(sameParent(rightNeighbour, c))) break;
+            int currentDepth = rightNeighbour.getDepth();
 
-            // Normal case
-            if (sameParent(rightNeighbour, c) && c.winsOver(rightNeighbour)) break;
+            // Too shallow -> either parent has no children yet or node lost to all children -> insert here
+            if (currentDepth < targetDepth) break;
+
+            // Sibling -> check winsOver
+            if (currentDepth == targetDepth)
+            {
+                // Same depth implies sibling; cousins are unreachable because
+                // their parent (depth targetDepth-1) would trigger the shallow break first
+                if (c.winsOver(rightNeighbour)) break;
+            }
+
+            // Otherwise, currentDepth > targetDepth -> skip sibling's children
             leftNeighbour = rightNeighbour;
             rightNeighbour = rightNeighbour.getNext();
         }
+
         c.setNext(rightNeighbour);
         c.setPrev(leftNeighbour);
         leftNeighbour.setNext(c);
@@ -43,15 +57,16 @@ public class CharDLL implements ICRDT {
     }
 
     @Override
-    public void delete(String id) throws RuntimeException {
+    public void delete(String id) {
         CharNode c = map.get(id);
-        if (c == null) throw new RuntimeException("Node not found " + id);
+        if (c == null) return;
         c.delete();
         // Will not remove from hashmap bec future inserts may still reference it as a parent
     }
 
     @Override
     public String collectText() {
+        // Doesn't account for rich text yet
         var text = new StringBuilder();
         CharNode vPtr = head.getNext();
         while(vPtr != null)
@@ -60,11 +75,5 @@ public class CharDLL implements ICRDT {
             vPtr = vPtr.getNext();
         }
         return text.toString();
-    }
-
-    // Helper function for insert
-    private boolean sameParent(CharNode c1, CharNode c2)
-    {
-        return c1.getParentID().equals(c2.getParentID());
     }
 }

@@ -7,13 +7,17 @@ public class CharNode {
     private final long time;
     private final char content;
     private final String parentID; // null if parent is root
+
+    // Mutable
+    private int depth;
+    private boolean isDeleted;
+    private boolean isBold;
+    private boolean isItalic;
     private CharNode next;
     private CharNode prev;
 
-    // Mutable
-    private boolean isDeleted;
 
-    public CharNode(int siteID, long clock, char content, String parentID)
+    public CharNode(int siteID, long clock, char content, String parentID, boolean isBold, boolean isItalic)
     {
         this.clock = clock;
         this.siteID = siteID;
@@ -22,6 +26,8 @@ public class CharNode {
         isDeleted = false;
         this.parentID = parentID;
         time = System.currentTimeMillis();
+        this.isBold = isBold;
+        this.isItalic = isItalic;
     }
 
     public boolean isDeleted() { return this.isDeleted; }
@@ -29,10 +35,14 @@ public class CharNode {
     public char getContent() { return this.content; }
     public String getParentID() { return this.parentID; }
     public CharNode getNext() { return this.next; }
+    public int getDepth() { return this.depth; }
 
     public void setNext(CharNode n) { this.next = n; }
     public void setPrev(CharNode p) { this.prev = p; }
     public void delete() { this.isDeleted = true; } // Mark as tombstone
+    public void toggleBold() { this.isBold = !this.isBold; }
+    public void toggleItalic() { this.isItalic = !this.isItalic; }
+    public void setDepth(int depth) { this.depth = depth; }
 
     public boolean winsOver(CharNode other) throws RuntimeException {
         if (this.time != other.time)
