@@ -8,19 +8,19 @@ public class CharDLL implements ICRDT {
 
     public CharDLL()
     {
-        head = new CharNode(0, 0, '\0', "ROOT", false, false);
+        head = new CharNode(0, 0, 0, '\0', "ROOT");
         head.setNext(null);
         map = new HashMap<>();
         map.put("ROOT", head);
     }
 
     @Override
-    public void insert(CharNode c) throws RuntimeException {
+    public void insert(CharNode c) {
         // Find parent
         CharNode parent = map.get(c.getParentID());
 
-        // Throw a runtime exception first if node is an orphan before adding to the map
-        if (parent == null) throw new RuntimeException("Parent not found: " + c.getParentID());
+        if (parent == null) return;
+        if (map.containsKey(c.getCharID())) return;
 
         map.put(c.getCharID(), c);
         int targetDepth = parent.getDepth() + 1;

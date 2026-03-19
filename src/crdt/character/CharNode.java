@@ -17,7 +17,7 @@ public class CharNode {
     private CharNode prev;
 
 
-    public CharNode(int siteID, long clock, char content, String parentID, boolean isBold, boolean isItalic)
+    public CharNode(int siteID, long clock, long time, char content, String parentID, boolean isBold, boolean isItalic)
     {
         this.clock = clock;
         this.siteID = siteID;
@@ -25,9 +25,23 @@ public class CharNode {
         this.content = content;
         isDeleted = false;
         this.parentID = parentID;
-        time = System.currentTimeMillis();
+        this.time = time;
         this.isBold = isBold;
         this.isItalic = isItalic;
+    }
+
+    // Constructor without bold & italic
+    public CharNode(int siteID, long clock, long time, char content, String parentID)
+    {
+        this.clock = clock;
+        this.siteID = siteID;
+        this.charID = siteID + "-" + clock;
+        this.content = content;
+        isDeleted = false;
+        this.parentID = parentID;
+        this.time = time;
+        this.isBold = false;
+        this.isItalic = false;
     }
 
     public boolean isDeleted() { return this.isDeleted; }
@@ -40,15 +54,13 @@ public class CharNode {
     public void setNext(CharNode n) { this.next = n; }
     public void setPrev(CharNode p) { this.prev = p; }
     public void delete() { this.isDeleted = true; } // Mark as tombstone
-    public void toggleBold() { this.isBold = !this.isBold; }
-    public void toggleItalic() { this.isItalic = !this.isItalic; }
+    public void setBold(boolean bold) { this.isBold = bold; }
+    public void setItalic(boolean italic) { this.isItalic = italic; }
     public void setDepth(int depth) { this.depth = depth; }
 
     public boolean winsOver(CharNode other) throws RuntimeException {
         if (this.time != other.time)
             return this.time > other.time;
-        if (this.siteID != other.siteID)
-            return this.siteID > other.siteID;
-        throw new RuntimeException("Duplicate ID: " + this.charID);
+        return this.siteID < other.siteID;
     }
 }
