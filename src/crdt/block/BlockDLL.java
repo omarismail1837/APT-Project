@@ -79,6 +79,17 @@ public class BlockDLL implements ICRDT<BlockNode> {
         return newBlock;
     }
 
+    public void mergeBlocks(String firstBlockID, String secondBlockID) {
+        BlockNode first = map.get(firstBlockID);
+        BlockNode second = map.get(secondBlockID);
+
+        if (first == null || second == null) return;
+        if (first.isDeleted() || second.isDeleted()) return;
+
+        first.getContent().mergeInto(second.getContent());
+        second.delete();
+    }
+
     @Override
     public String collectText() {
         StringBuilder text = new StringBuilder();

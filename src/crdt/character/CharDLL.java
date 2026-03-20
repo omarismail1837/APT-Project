@@ -101,4 +101,30 @@ public class CharDLL implements ICRDT<CharNode> {
         }
         return newDLL;
     }
+   //function needed in block operations to merge two blocks
+    public void mergeInto(CharDLL other) {
+        CharNode ptr = head.getNext();
+        CharNode lastNode = null;
+        while (ptr != null) {
+            if (!ptr.isDeleted()) lastNode = ptr;
+            ptr = ptr.getNext();
+        }
+
+        String prevID = lastNode == null ? "ROOT" : lastNode.getCharID();
+        CharNode otherPtr = other.head.getNext();
+        while (otherPtr != null) {
+            if (!otherPtr.isDeleted()) {
+                CharNode newNode = new CharNode(
+                        otherPtr.getSiteID(),
+                        otherPtr.getClock(),
+                        otherPtr.getTime(),
+                        otherPtr.getContent(),
+                        prevID
+                );
+                this.insert(newNode);
+                prevID = otherPtr.getSiteID() + "-" + otherPtr.getClock();
+            }
+            otherPtr = otherPtr.getNext();
+        }
+    }
 }
