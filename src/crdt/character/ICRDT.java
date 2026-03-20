@@ -1,7 +1,7 @@
 package crdt.character;
 
-public interface ICRDT {
-    void insert(CharNode c);
+public interface ICRDT <T>{
+    void insert(T node);
     void delete(String id);
     String collectText();
 }

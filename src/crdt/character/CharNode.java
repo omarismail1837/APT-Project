@@ -51,6 +51,10 @@ public class CharNode {
     public CharNode getNext() { return this.next; }
     public int getDepth() { return this.depth; }
 
+    public int getSiteID() { return this.siteID; }
+    public long getClock() { return this.clock; }
+    public long getTime() { return this.time; }
+
     public void setNext(CharNode n) { this.next = n; }
     public void setPrev(CharNode p) { this.prev = p; }
     public void delete() { this.isDeleted = true; } // Mark as tombstone

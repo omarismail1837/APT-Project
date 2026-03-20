@@ -2,7 +2,7 @@ package crdt.character;
 
 import java.util.HashMap;
 
-public class CharDLL implements ICRDT {
+public class CharDLL implements ICRDT<CharNode> {
     private CharNode head; // sentinel
     private HashMap<String, CharNode> map;
 
@@ -15,16 +15,16 @@ public class CharDLL implements ICRDT {
     }
 
     @Override
-    public void insert(CharNode c) {
+    public void insert(CharNode node) {
         // Find parent
-        CharNode parent = map.get(c.getParentID());
+        CharNode parent = map.get(node.getParentID());
 
         if (parent == null) return;
-        if (map.containsKey(c.getCharID())) return;
+        if (map.containsKey(node.getCharID())) return;
 
-        map.put(c.getCharID(), c);
+        map.put(node.getCharID(), node);
         int targetDepth = parent.getDepth() + 1;
-        c.setDepth(targetDepth);
+        node.setDepth(targetDepth);
 
         CharNode rightNeighbour = parent.getNext();
         CharNode leftNeighbour = parent;
@@ -41,7 +41,7 @@ public class CharDLL implements ICRDT {
             {
                 // Same depth implies sibling; cousins are unreachable because
                 // their parent (depth targetDepth-1) would trigger the shallow break first
-                if (c.winsOver(rightNeighbour)) break;
+                if (node.winsOver(rightNeighbour)) break;
             }
 
             // Otherwise, currentDepth > targetDepth -> skip sibling's children
@@ -49,11 +49,11 @@ public class CharDLL implements ICRDT {
             rightNeighbour = rightNeighbour.getNext();
         }
 
-        c.setNext(rightNeighbour);
-        c.setPrev(leftNeighbour);
-        leftNeighbour.setNext(c);
+        node.setNext(rightNeighbour);
+        node.setPrev(leftNeighbour);
+        leftNeighbour.setNext(node);
         if (rightNeighbour != null)
-            rightNeighbour.setPrev(c);
+            rightNeighbour.setPrev(node);
     }
 
     @Override
@@ -75,5 +75,30 @@ public class CharDLL implements ICRDT {
             vPtr = vPtr.getNext();
         }
         return text.toString();
+    }
+
+
+    //function needed in block operations to split a single block
+    public CharDLL splitAt(String charID) {
+        CharDLL newDLL = new CharDLL();
+        CharNode ptr = map.get(charID);
+        if (ptr == null) return newDLL;
+        String prevID = "ROOT";
+        while (ptr != null) {
+            if (!ptr.isDeleted()) {
+                CharNode newNode = new CharNode(
+                        ptr.getSiteID(),
+                        ptr.getClock(),
+                        ptr.getTime(),
+                        ptr.getContent(),
+                        prevID
+                );
+                newDLL.insert(newNode);
+                prevID = ptr.getSiteID() + "-" + ptr.getClock();
+            }
+            this.delete(ptr.getCharID());
+            ptr = ptr.getNext();
+        }
+        return newDLL;
     }
 }
