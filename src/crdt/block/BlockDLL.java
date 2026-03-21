@@ -74,7 +74,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
                 newContent,
                 blockID
         );
-
+        CharNode ptr = newBlock.getContent().getHead().getNext();
+        while (ptr != null) {
+            if (!ptr.isDeleted()) charBlockMap.put(ptr.getCharID(), newBlock.getBlockID());
+            ptr = ptr.getNext();
+        }
         insert(newBlock);
         return newBlock;
     }
@@ -85,7 +89,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         if (first == null || second == null) return;
         if (first.isDeleted() || second.isDeleted()) return;
-
+        CharNode ptr = second.getContent().getHead().getNext();
+        while (ptr != null) {
+            if (!ptr.isDeleted()) charBlockMap.put(ptr.getCharID(), firstBlockID);
+            ptr = ptr.getNext();
+        }
         first.getContent().mergeInto(second.getContent());
         second.delete();
     }
@@ -183,24 +191,30 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         //if it cant be merged to block before or block after
     }
-    public void modifyBlock(String blockID, String oldCharID, CharNode newChar) {
+    public void insertChar(String parentCharID, CharNode newChar) {
+        String blockID = charBlockMap.get(parentCharID);
+        if (blockID == null) return;
+
         BlockNode block = map.get(blockID);
         if (block == null || block.isDeleted()) return;
-        if (oldCharID != null) {
-            block.getContent().delete(oldCharID);
-            charBlockMap.remove(oldCharID);
-        }
-        if (newChar != null) {
-            block.getContent().insert(newChar);
-            charBlockMap.put(newChar.getCharID(), blockID);
-        }
+
+        block.getContent().insert(newChar);
+        charBlockMap.put(newChar.getCharID(), blockID);
     }
-    public void modifyBlock(String blockID, CharNode newChar) {
-        modifyBlock(blockID, null, newChar);
+    public void deleteChar(String charID) {
+        String blockID = charBlockMap.get(charID);
+        if (blockID == null) return;
+
+        BlockNode block = map.get(blockID);
+        if (block == null) return;
+        block.getContent().delete(charID);
+        charBlockMap.remove(charID);
     }
-    public void modifyBlock(String blockID, String charID) {
-        modifyBlock(blockID, charID, null);
+    public void replaceChar(String oldCharID, CharNode newChar) {
+        deleteChar(oldCharID);
+        insertChar(oldCharID, newChar);
     }
+
     public CharDLL copyBlockContent(String blockID, int siteID, long clock, String startCharID) {
         BlockNode block = map.get(blockID);
         if (block == null || block.isDeleted()) return null;

@@ -170,4 +170,5 @@ public class CharDLL implements ICRDT<CharNode> {
         }
         return newDLL;
     }
+    public CharNode getHead() { return head; }
 }
