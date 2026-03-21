@@ -245,8 +245,14 @@ public class BlockDLL implements ICRDT<BlockNode> {
         automerge(blockID, siteID, time, clock);
     }
     public void replaceChar(String oldCharID, CharNode newChar,int siteID, long clock, long time) {
-        deleteChar(oldCharID, siteID,clock, time);
-        insertChar(oldCharID, newChar);
+        String blockID = charBlockMap.get(oldCharID);
+        deleteChar(oldCharID, siteID, clock, time);
+        if (blockID == null) return;
+        BlockNode block = map.get(blockID);
+        if (block == null || block.isDeleted()) return;
+        block.getContent().insert(newChar);
+        charBlockMap.put(newChar.getCharID(), blockID);
+        autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
     }
 
     public CharDLL copyBlockContent(String blockID, int siteID, long clock, long time, String startCharID) {
