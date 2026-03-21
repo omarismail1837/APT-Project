@@ -1,6 +1,7 @@
 package crdt.block;
 
 import crdt.character.CharDLL;
+import crdt.character.CharNode;
 import crdt.character.ICRDT;
 import java.util.HashMap;
 
@@ -180,5 +181,16 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         //if it cant be merged to block before or block after
     }
-
+    public void modifyBlock(String blockID, String oldCharID, CharNode newChar) {
+        BlockNode block = map.get(blockID);
+        if (block == null || block.isDeleted()) return;
+        if (oldCharID != null) block.getContent().delete(oldCharID);
+        if (newChar != null) block.getContent().insert(newChar);
+    }
+    public void modifyBlock(String blockID, CharNode newChar) {
+        modifyBlock(blockID, null, newChar);
+    }
+    public void modifyBlock(String blockID, String charID) {
+        modifyBlock(blockID, charID, null);
+    }
 }
