@@ -6,16 +6,12 @@ import java.util.HashMap;
 public class BlockDLL implements ICRDT<BlockNode> {
     private BlockNode head; // sentinel
     private HashMap<String, BlockNode> map;
-    private long clock;
-    private int siteID;
 
-    public BlockDLL(int siteID, long clock) {
+    public BlockDLL() {
         head = new BlockNode();
         head.setNext(null);
         map = new HashMap<>();
         map.put("ROOT", head);
-        this.clock = clock;
-        this.siteID = siteID;
     }
 
     @Override
@@ -59,7 +55,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         b.delete();
     }
 
-    public BlockNode splitBlock(String blockID, String charID) {
+    public BlockNode splitBlock(int siteID, long clock, String blockID, String charID) {
         BlockNode original = map.get(blockID);
         if (original == null || original.isDeleted()) return null;
 
@@ -68,8 +64,8 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         // New block is a child of the original block in the tree
         BlockNode newBlock = new BlockNode(
-                this.siteID,
-                this.clock++,
+                siteID,
+                clock,
                 System.currentTimeMillis(),
                 newContent,
                 blockID
