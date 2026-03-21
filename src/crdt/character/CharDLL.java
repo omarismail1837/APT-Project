@@ -7,9 +7,9 @@ public class CharDLL implements ICRDT<CharNode> {
     private HashMap<String, CharNode> map;
     private int lineCount;
 
-    public CharDLL()
+    public CharDLL(int siteID, long clock, long time)
     {
-        head = new CharNode(0, 0, 0, '\0', "ROOT");
+        head = new CharNode(siteID, clock, time, '\0', "ROOT");
         head.setNext(null);
         map = new HashMap<>();
         map.put("ROOT", head);
@@ -85,8 +85,8 @@ public class CharDLL implements ICRDT<CharNode> {
 
 
     //function needed in block operations to split a single block
-    public CharDLL splitAt(String charID) {
-        CharDLL newDLL = new CharDLL();
+    public CharDLL splitAt(int siteID, long clock, long time, String charID) {
+        CharDLL newDLL = new CharDLL(siteID, clock, time);
         CharNode ptr = map.get(charID);
         if (ptr == null) return newDLL;
         String prevID = "ROOT";
@@ -141,7 +141,7 @@ public class CharDLL implements ICRDT<CharNode> {
 
     //function needed in block operations to copy
     public CharDLL copy(int SiteID,long clock,long time) {
-        CharDLL clone = new CharDLL();
+        CharDLL clone = new CharDLL(SiteID, clock, time);
 
         CharNode temp = head.getNext(); //start from the node after head (the first node after root)
         String parentID = head.getCharID(); //all heads (roots) have same ID
@@ -154,11 +154,11 @@ public class CharDLL implements ICRDT<CharNode> {
         }
         return clone;
     }
-    public CharDLL copy(int siteID, long clock, String startCharID) {
-        CharDLL newDLL = new CharDLL();
+    public CharDLL copy(int siteID, long clock, long time, String startCharID) {
+        CharDLL newDLL = new CharDLL(siteID,clock,time);
         CharNode ptr = startCharID == null ? head.getNext() : map.get(startCharID);
         if (ptr == null) return newDLL;
-        String prevID = "ROOT";
+        String prevID = newDLL.head.getCharID();
         while (ptr != null) {
             if (!ptr.isDeleted()) {
                 CharNode newNode = new CharNode(siteID, clock, ptr.getTime(), ptr.getContent(), prevID, ptr.getBold(), ptr.getItalic());

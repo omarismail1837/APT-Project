@@ -28,18 +28,18 @@ public class Tests {
     {
         long t = System.currentTimeMillis();
 
-        CharDLL crdt = new CharDLL();
+        CharDLL crdt = new CharDLL(0,0,0);
         check("Empty document returns empty string", crdt.collectText().isEmpty());
 
-        CharDLL crdt2 = new CharDLL();
+        CharDLL crdt2 = new CharDLL(0,0,0);
         crdt2.insert(new CharNode(1, 0, t, 'h', "ROOT"));
         check("Single insert produces correct character", crdt2.collectText().equals("h"));
 
-        CharDLL crdt22 = new CharDLL();
+        CharDLL crdt22 = new CharDLL(0,0,0);
         crdt22.insert(new CharNode(1, 0, 1, 'l', "1-2"));
         check("Orphan insert is silently ignored", crdt22.collectText().isEmpty());
 
-        CharDLL crdt3 = new CharDLL();
+        CharDLL crdt3 = new CharDLL(0,0,0);
         crdt3.insert(new CharNode(1, 0, System.currentTimeMillis(), 'h', "ROOT"));
         crdt3.insert(new CharNode(1, 1, System.currentTimeMillis(), 'e', "1-0"));
         crdt3.insert(new CharNode(1, 2, System.currentTimeMillis(), 'l', "1-1"));
@@ -57,12 +57,12 @@ public class Tests {
         crdt3.delete("1-4");
         check("Deleting a character removes it from collected text", crdt3.collectText().equals("hello world"));
 
-        CharDLL crdt4 = new CharDLL();
+        CharDLL crdt4 = new CharDLL(0,0,0);
         crdt4.insert(new CharNode(1, 0, 1, 'h', "ROOT"));
         crdt4.insert(new CharNode(1, 0, 1, 'h', "ROOT"));
         check("Duplicate insert is silently ignored", crdt4.collectText().equals("h"));
 
-        CharDLL crdt5 = new CharDLL();
+        CharDLL crdt5 = new CharDLL(0,0,0);
         crdt5.insert(new CharNode(1, 0, 1, 'h', "ROOT"));
         crdt5.delete("1-0");
         crdt5.delete("1-0");
@@ -71,14 +71,14 @@ public class Tests {
         crdt5.insert(new CharNode(1, 1, 2, 'e', "1-0"));
         check("Child of deleted node is inserted correctly", crdt5.collectText().equals("e"));
 
-        CharDLL crdt6 = new CharDLL();
+        CharDLL crdt6 = new CharDLL(0,0,0);
         crdt6.insert(new CharNode(1, 0, 1, 'A', "ROOT"));
         crdt6.insert(new CharNode(1, 1, 2, 'B', "1-0"));
         crdt6.insert(new CharNode(1, 2, 3, 'C', "1-1"));
         crdt6.delete("1-0");
         check("Deleting a node preserves its children in collected text", crdt6.collectText().equals("BC"));
 
-        CharDLL crdt7 = new CharDLL();
+        CharDLL crdt7 = new CharDLL(0,0,0);
         try {
             crdt7.delete("fake-id");
             check("Delete of non-existent node is silently ignored", true);
@@ -86,7 +86,7 @@ public class Tests {
             check("Delete of non-existent node is silently ignored", false);
         }
 
-        CharDLL crdt8 = new CharDLL();
+        CharDLL crdt8 = new CharDLL(0,0,0);
         crdt8.insert(new CharNode(1, 0, 1, 'h', "ROOT"));
         crdt8.insert(new CharNode(1, 1, 2, 'i', "1-0"));
         crdt8.delete("1-0");
@@ -96,21 +96,21 @@ public class Tests {
 
     private static void testOrdering()
     {
-        CharDLL crdt = new CharDLL();
+        CharDLL crdt = new CharDLL(0,0,0);
         crdt.insert(new CharNode(1, 0, System.currentTimeMillis(), 'A', "ROOT"));
         crdt.insert(new CharNode(2, 0, System.currentTimeMillis() + 1, 'P', "ROOT"));
         crdt.insert(new CharNode(3, 0, System.currentTimeMillis() + 2, 'T', "ROOT"));
         check("Higher timestamp placed before lower timestamp sibling", crdt.collectText().equals("TPA"));
 
-        CharDLL crdt2 = new CharDLL();
+        CharDLL crdt2 = new CharDLL(0,0,0);
         long t = System.currentTimeMillis() + 3;
         crdt2.insert(new CharNode(1, 0, t, 'A', "ROOT"));
         crdt2.insert(new CharNode(2, 0, t, 'P', "ROOT"));
         crdt2.insert(new CharNode(3, 0, t, 'T', "ROOT"));
         check("Lower siteID wins when timestamps are equal", crdt2.collectText().equals("APT"));
 
-        CharDLL dll1 = new CharDLL();
-        CharDLL dll2 = new CharDLL();
+        CharDLL dll1 = new CharDLL(0,0,0);
+        CharDLL dll2 = new CharDLL(0,0,0);
         dll1.insert(new CharNode(1, 0, 1, 'A', "ROOT"));
         dll1.insert(new CharNode(2, 0, 2, 'B', "ROOT"));
         dll1.insert(new CharNode(3, 0, 3, 'C', "ROOT"));
@@ -122,14 +122,14 @@ public class Tests {
 
     private static void testDepthAndSiblings()
     {
-        CharDLL dll1 = new CharDLL();
+        CharDLL dll1 = new CharDLL(0,0,0);
         var c1 = new CharNode(1, 0, 1, 'Y', "ROOT");
         var c2 = new CharNode(1, 1, 2, 'N', "1-0");
         dll1.insert(c1);
         dll1.insert(c2);
         check("Depth increments correctly per level", c1.getDepth() == 1 && c2.getDepth() == 2);
 
-        CharDLL dll2 = new CharDLL();
+        CharDLL dll2 = new CharDLL(0,0,0);
         c1 = new CharNode(1, 0, 1, 'Y', "ROOT");
         dll2.insert(c1);
         dll2.insert(new CharNode(1, 1, 2, 'a', "1-0"));
@@ -138,7 +138,7 @@ public class Tests {
         dll2.insert(new CharNode(2, 0, 1, 'N', "ROOT"));
         check("Losing sibling is placed after winning sibling's descendants", dll2.collectText().equals("YasmN"));
 
-        CharDLL dll3 = new CharDLL();
+        CharDLL dll3 = new CharDLL(0,0,0);
         c1 = new CharNode(1, 0, 1, 'Y', "ROOT");
         dll3.insert(c1);
         dll3.insert(new CharNode(1, 1, 2, 'a', "1-0"));

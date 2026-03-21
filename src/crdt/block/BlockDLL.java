@@ -61,12 +61,12 @@ public class BlockDLL implements ICRDT<BlockNode> {
         b.delete();
     }
 
-    public BlockNode splitBlock(int siteID, long clock, String blockID, String charID) {
+    public BlockNode splitBlock(int siteID, long clock, long time, String blockID, String charID) {
         BlockNode original = map.get(blockID);
         if (original == null || original.isDeleted()) return null;
 
         // Split the CharDLL at charID
-        crdt.character.CharDLL newContent = original.getContent().splitAt(charID);
+        crdt.character.CharDLL newContent = original.getContent().splitAt(siteID,clock,time,charID);
         BlockNode newBlock = new BlockNode(
                 siteID,
                 clock,
@@ -157,7 +157,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
     //auto merge and split
     //if line count > 10 then split block - should be checked when inserting and pasting
-    public void autosplit(int siteID, long clock, String blockID) {
+    public void autosplit(int siteID, long clock, long time, String blockID) {
         //split lines after 10th and merge to the one after
         //if it cant fit in block after then split block after and merge....
         BlockNode updatedBlock = map.get(blockID);
@@ -167,7 +167,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (updatedBlock.getContent().getLineCount() <= 10) return;
         String CharID = updatedBlock.getContent().getCharIDAtLine(10);
         if (CharID == null) return;
-        BlockNode newBlock = splitBlock(siteID, clock, blockID, CharID);
+        BlockNode newBlock = splitBlock(siteID, clock, time, blockID, CharID);
         if (newBlock == null) return;
 
         BlockNode nextBlock = newBlock.getNext();
@@ -175,7 +175,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
             nextBlock = nextBlock.getNext();
         if (nextBlock == null) return;
         mergeBlocks(newBlock.getBlockID(), nextBlock.getBlockID());
-        autosplit(siteID, clock + 1, newBlock.getBlockID());
+        autosplit(siteID, clock + 1, time, newBlock.getBlockID());
 
     }
 
@@ -212,7 +212,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         block.getContent().insert(newChar);
         charBlockMap.put(newChar.getCharID(), blockID);
-        autosplit(newChar.getSiteID(), newChar.getClock() + 1, blockID);
+        autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
     }
     public void deleteChar(String charID) {
         String blockID = charBlockMap.get(charID);
@@ -229,20 +229,20 @@ public class BlockDLL implements ICRDT<BlockNode> {
         insertChar(oldCharID, newChar);
     }
 
-    public CharDLL copyBlockContent(String blockID, int siteID, long clock, String startCharID) {
+    public CharDLL copyBlockContent(String blockID, int siteID, long clock, long time, String startCharID) {
         BlockNode block = map.get(blockID);
         if (block == null || block.isDeleted()) return null;
-        return block.getContent().copy(siteID, clock, startCharID);
+        return block.getContent().copy(siteID, clock, time, startCharID);
     }
-    public void pasteBlockContent(int siteID, long clock, String targetBlockID, String charID, CharDLL copied) {
-        BlockNode secondHalf = splitBlock(siteID, clock, targetBlockID, charID);
+    public void pasteBlockContent(int siteID, long clock, long time, String targetBlockID, String charID, CharDLL copied) {
+        BlockNode secondHalf = splitBlock(siteID, clock, time, targetBlockID, charID);
         BlockNode first = map.get(targetBlockID);
         first.getContent().mergeInto(copied);
         if (secondHalf != null) {
             first.getContent().mergeInto(secondHalf.getContent());
             secondHalf.delete();
         }
-        autosplit(siteID, clock + 1, targetBlockID);
+        autosplit(siteID, clock + 1, time, targetBlockID);
     }
 
 }
