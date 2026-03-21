@@ -12,7 +12,7 @@ public class CharDLL implements ICRDT<CharNode> {
         head = new CharNode(siteID, clock, time, '\0', "ROOT");
         head.setNext(null);
         map = new HashMap<>();
-        map.put("ROOT", head);
+        map.put(head.getCharID(), head);
         lineCount = 0;
     }
 
