@@ -14,8 +14,6 @@ public class CharNode {
     private boolean isBold;
     private boolean isItalic;
     private CharNode next;
-    private CharNode prev;
-
 
     public CharNode(int siteID, long clock, long time, char content, String parentID, boolean isBold, boolean isItalic)
     {
@@ -56,7 +54,6 @@ public class CharNode {
     public long getTime() { return this.time; }
 
     public void setNext(CharNode n) { this.next = n; }
-    public void setPrev(CharNode p) { this.prev = p; }
     public void delete() { this.isDeleted = true; } // Mark as tombstone
     public void setBold(boolean bold) { this.isBold = bold; }
     public void setItalic(boolean italic) { this.isItalic = italic; }

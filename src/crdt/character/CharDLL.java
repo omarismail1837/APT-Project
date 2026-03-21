@@ -50,10 +50,7 @@ public class CharDLL implements ICRDT<CharNode> {
         }
 
         node.setNext(rightNeighbour);
-        node.setPrev(leftNeighbour);
         leftNeighbour.setNext(node);
-        if (rightNeighbour != null)
-            rightNeighbour.setPrev(node);
     }
 
     @Override

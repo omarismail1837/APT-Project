@@ -46,10 +46,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         }
 
         b.setNext(rightNeighbour);
-        b.setPrev(leftNeighbour);
         leftNeighbour.setNext(b);
-        if (rightNeighbour != null)
-            rightNeighbour.setPrev(b);
     }
 
     @Override
@@ -89,6 +86,40 @@ public class BlockDLL implements ICRDT<BlockNode> {
         first.getContent().mergeInto(second.getContent());
         second.delete();
     }
+
+    public void moveBlock(String BlockID, String TargetBlockID) {
+        //TargetBlockID is the block before where it should be moved to
+        BlockNode moving = map.get(BlockID);
+        BlockNode target = map.get(TargetBlockID);
+
+        if (moving == null || target == null) return;
+
+        BlockNode leftneighbour = map.get(moving.getParentID());
+        while (leftneighbour.getNext() != moving)
+            leftneighbour = leftneighbour.getNext();
+
+        leftneighbour.setNext(moving.getNext());
+        moving.setNext((target.getNext()));
+
+        //leftneighbour should inherit children of moving
+        BlockNode temp = leftneighbour.getNext();
+        int movingDepth = moving.getDepth();
+        String movingID = moving.getBlockID();
+        while (temp != null && temp.getDepth() > movingDepth) { //while temp is a child of moving
+            if (temp.getParentID().equals(movingID))
+               temp.setParentID(leftneighbour.getBlockID());
+
+            temp.setDepth(temp.getDepth()-1);
+            temp = temp.getNext();
+        }
+
+        target.setNext(moving);
+        moving.setDepth(target.getDepth()+1); //it is a child of target to be directly after
+        moving.setParentID(target.getBlockID());
+
+    }
+
+
 
     @Override
     public String collectText() {
