@@ -97,7 +97,9 @@ public class CharDLL implements ICRDT<CharNode> {
                         ptr.getClock(),
                         ptr.getTime(),
                         ptr.getContent(),
-                        prevID
+                        prevID,
+                        ptr.getBold(),
+                        ptr.getItalic()
                 );
                 newDLL.insert(newNode);
                 prevID = ptr.getSiteID() + "-" + ptr.getClock();
@@ -126,7 +128,9 @@ public class CharDLL implements ICRDT<CharNode> {
                         otherPtr.getClock(),
                         otherPtr.getTime(),
                         otherPtr.getContent(),
-                        prevID
+                        prevID,
+                        otherPtr.getBold(),
+                        otherPtr.getItalic()
                 );
                 this.insert(newNode);
                 prevID = otherPtr.getSiteID() + "-" + otherPtr.getClock();
@@ -150,5 +154,20 @@ public class CharDLL implements ICRDT<CharNode> {
         }
         return clone;
     }
-
+    public CharDLL copy(int siteID, long clock, String startCharID) {
+        CharDLL newDLL = new CharDLL();
+        CharNode ptr = startCharID == null ? head.getNext() : map.get(startCharID);
+        if (ptr == null) return newDLL;
+        String prevID = "ROOT";
+        while (ptr != null) {
+            if (!ptr.isDeleted()) {
+                CharNode newNode = new CharNode(siteID, clock, ptr.getTime(), ptr.getContent(), prevID, ptr.getBold(), ptr.getItalic());
+                newDLL.insert(newNode);
+                prevID = siteID + "-" + clock;
+                clock++;
+            }
+            ptr = ptr.getNext();
+        }
+        return newDLL;
+    }
 }

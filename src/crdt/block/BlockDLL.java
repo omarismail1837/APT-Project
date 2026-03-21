@@ -193,4 +193,19 @@ public class BlockDLL implements ICRDT<BlockNode> {
     public void modifyBlock(String blockID, String charID) {
         modifyBlock(blockID, charID, null);
     }
+    public CharDLL copyBlockContent(String blockID, int siteID, long clock, String startCharID) {
+        BlockNode block = map.get(blockID);
+        if (block == null || block.isDeleted()) return null;
+        return block.getContent().copy(siteID, clock, startCharID);
+    }
+    public void pasteBlockContent(int siteID, long clock, String targetBlockID, String charID, CharDLL copied) {
+        BlockNode secondHalf = splitBlock(siteID, clock, targetBlockID, charID);
+        BlockNode first = map.get(targetBlockID);
+        first.getContent().mergeInto(copied);
+        if (secondHalf != null) {
+            first.getContent().mergeInto(secondHalf.getContent());
+            secondHalf.delete();
+        }
+    }
+
 }
