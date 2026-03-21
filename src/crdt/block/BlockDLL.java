@@ -6,9 +6,9 @@ import crdt.character.ICRDT;
 import java.util.HashMap;
 
 public class BlockDLL implements ICRDT<BlockNode> {
-    private BlockNode head; // sentinel
-    private HashMap<String, BlockNode> map;
-    private HashMap<String, String> charBlockMap;
+    private final BlockNode head; // sentinel
+    private final HashMap<String, BlockNode> map;
+    private final HashMap<String, String> charBlockMap;
 
     public BlockDLL() {
         head = new BlockNode();
@@ -96,7 +96,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (first.isDeleted() || second.isDeleted()) return;
         CharNode ptr = second.getContent().getHead().getNext();
         while (ptr != null) {
-            if (!ptr.isDeleted()) charBlockMap.put(ptr.getCharID(), firstBlockID);
+            charBlockMap.put(ptr.getCharID(), firstBlockID);
             ptr = ptr.getNext();
         }
         first.getContent().mergeInto(second.getContent());
@@ -242,12 +242,17 @@ public class BlockDLL implements ICRDT<BlockNode> {
         BlockNode block = map.get(blockID);
         if (block == null) return;
         block.getContent().delete(charID);
-        charBlockMap.remove(charID);
         automerge(blockID, siteID, time, clock);
     }
     public void replaceChar(String oldCharID, CharNode newChar,int siteID, long clock, long time) {
-        deleteChar(oldCharID, siteID,clock, time);
-        insertChar(oldCharID, newChar);
+        String blockID = charBlockMap.get(oldCharID);
+        deleteChar(oldCharID, siteID, clock, time);
+        if (blockID == null) return;
+        BlockNode block = map.get(blockID);
+        if (block == null || block.isDeleted()) return;
+        block.getContent().insert(newChar);
+        charBlockMap.put(newChar.getCharID(), blockID);
+        autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
     }
 
     public CharDLL copyBlockContent(String blockID, int siteID, long clock, long time, String startCharID) {
