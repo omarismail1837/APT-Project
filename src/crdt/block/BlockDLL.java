@@ -142,4 +142,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
     public BlockNode getBlock(String blockID) {
         return map.get(blockID);
     }
+
+    //auto merge and split
+
 }

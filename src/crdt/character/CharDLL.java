@@ -5,6 +5,7 @@ import java.util.HashMap;
 public class CharDLL implements ICRDT<CharNode> {
     private final CharNode head; // sentinel
     private HashMap<String, CharNode> map;
+    private int lineCount;
 
     public CharDLL()
     {
@@ -12,6 +13,7 @@ public class CharDLL implements ICRDT<CharNode> {
         head.setNext(null);
         map = new HashMap<>();
         map.put("ROOT", head);
+        lineCount = 0;
     }
 
     @Override
@@ -51,12 +53,16 @@ public class CharDLL implements ICRDT<CharNode> {
 
         node.setNext(rightNeighbour);
         leftNeighbour.setNext(node);
+
+        if (node.getContent() == '\n') lineCount++;
     }
 
     @Override
     public void delete(String id) {
         CharNode c = map.get(id);
         if (c == null) return;
+        if (!c.isDeleted() && c.getContent() == '\n') lineCount--;
+        //decrement line count if new line wasnt already deleted... important if 2 users delete line at same time
         c.delete();
         // Will not remove from hashmap bec future inserts may still reference it as a parent
     }
