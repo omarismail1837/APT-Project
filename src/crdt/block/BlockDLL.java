@@ -8,14 +8,18 @@ import java.util.HashMap;
 public class BlockDLL implements ICRDT<BlockNode> {
     private BlockNode head; // sentinel
     private HashMap<String, BlockNode> map;
+    private HashMap<String, String> charBlockMap;
 
     public BlockDLL() {
         head = new BlockNode();
         head.setNext(null);
         map = new HashMap<>();
+        charBlockMap = new HashMap<>();
         map.put("ROOT", head);
     }
-
+    public String getBlockIDByCharID(String charID) {
+        return charBlockMap.get(charID);
+    }
     @Override
     public void insert(BlockNode b) {
         BlockNode parent = map.get(b.getParentID());
@@ -61,10 +65,8 @@ public class BlockDLL implements ICRDT<BlockNode> {
         BlockNode original = map.get(blockID);
         if (original == null || original.isDeleted()) return null;
 
-        // Split the CharDLL at charID, returns a new CharDLL with everything from charID onwards
+        // Split the CharDLL at charID
         crdt.character.CharDLL newContent = original.getContent().splitAt(charID);
-
-        // New block is a child of the original block in the tree
         BlockNode newBlock = new BlockNode(
                 siteID,
                 clock,
@@ -184,8 +186,14 @@ public class BlockDLL implements ICRDT<BlockNode> {
     public void modifyBlock(String blockID, String oldCharID, CharNode newChar) {
         BlockNode block = map.get(blockID);
         if (block == null || block.isDeleted()) return;
-        if (oldCharID != null) block.getContent().delete(oldCharID);
-        if (newChar != null) block.getContent().insert(newChar);
+        if (oldCharID != null) {
+            block.getContent().delete(oldCharID);
+            charBlockMap.remove(oldCharID);
+        }
+        if (newChar != null) {
+            block.getContent().insert(newChar);
+            charBlockMap.put(newChar.getCharID(), blockID);
+        }
     }
     public void modifyBlock(String blockID, CharNode newChar) {
         modifyBlock(blockID, null, newChar);
