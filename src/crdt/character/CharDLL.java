@@ -144,7 +144,7 @@ public class CharDLL implements ICRDT<CharNode> {
         CharDLL clone = new CharDLL(SiteID, clock, time);
 
         CharNode temp = head.getNext(); //start from the node after head (the first node after root)
-        String parentID = head.getCharID(); //all heads (roots) have same ID
+        String parentID = clone.head.getCharID(); //all heads (roots) have same ID
         while (temp != null) {
             //make a copy of temp charnode and insert into clone
             CharNode newNode = new CharNode(SiteID,clock++,time,temp.getContent(),parentID,temp.getBold(), temp.getItalic());

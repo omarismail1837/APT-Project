@@ -171,9 +171,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (newBlock == null) return;
 
         BlockNode nextBlock = newBlock.getNext();
+
         while (nextBlock != null && nextBlock.isDeleted())
             nextBlock = nextBlock.getNext();
         if (nextBlock == null) return;
+
         mergeBlocks(newBlock.getBlockID(), nextBlock.getBlockID());
         autosplit(siteID, clock + 1, time, newBlock.getBlockID());
 
