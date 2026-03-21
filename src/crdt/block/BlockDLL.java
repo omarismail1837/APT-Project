@@ -30,7 +30,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         map.put(b.getBlockID(), b);
         CharNode ptr = b.getContent().getHead().getNext();
         while (ptr != null) {
-            if (!ptr.isDeleted()) charBlockMap.put(ptr.getCharID(), b.getBlockID());
+            charBlockMap.put(ptr.getCharID(), b.getBlockID());
             ptr = ptr.getNext();
         }
         int targetDepth = parent.getDepth() + 1;
@@ -81,7 +81,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         );
         CharNode ptr = newBlock.getContent().getHead().getNext();
         while (ptr != null) {
-            if (!ptr.isDeleted()) charBlockMap.put(ptr.getCharID(), newBlock.getBlockID());
+            charBlockMap.put(ptr.getCharID(), newBlock.getBlockID());
             ptr = ptr.getNext();
         }
         insert(newBlock);
@@ -214,6 +214,8 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         //get next not deleted block
         BlockNode nextBlock = updatedBlock.getNext();
+        if (nextBlock == null) return;
+
         while (nextBlock != null && nextBlock.isDeleted()) {nextBlock = nextBlock.getNext();}
         if (nextBlock != null && nextBlock.getContent() != null && nextBlock.getContent().getLineCount() <= (10 - currentLineCount)) {
             mergeBlocks(blockID, nextBlock.getBlockID());
@@ -221,7 +223,6 @@ public class BlockDLL implements ICRDT<BlockNode> {
         }
         mergeBlocks(blockID, nextBlock.getBlockID());
         autosplit(siteID, clock, time, blockID);
-        //if it cant be merged to block before or block after
     }
     public void insertChar(String parentCharID, CharNode newChar) {
         String blockID = charBlockMap.get(parentCharID);
@@ -242,7 +243,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (block == null) return;
         block.getContent().delete(charID);
         charBlockMap.remove(charID);
-        automerge(charID, siteID, time, clock );
+        automerge(blockID, siteID, time, clock);
     }
     public void replaceChar(String oldCharID, CharNode newChar,int siteID, long clock, long time) {
         deleteChar(oldCharID, siteID,clock, time);
