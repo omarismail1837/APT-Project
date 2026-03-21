@@ -27,6 +27,7 @@ public class CharDLL implements ICRDT<CharNode> {
         if (map.containsKey(node.getCharID())) return;
 
         map.put(node.getCharID(), node);
+        if (node.getContent() == '\n') lineCount++;
         int targetDepth = parent.getDepth() + 1;
         node.setDepth(targetDepth);
 
