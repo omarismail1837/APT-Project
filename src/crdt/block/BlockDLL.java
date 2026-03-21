@@ -110,10 +110,14 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         if (moving == null || target == null) return;
 
+        BlockNode targetNext = target.getNext();
+
+
         BlockNode leftNeighbour = moving.getPrev();
+        BlockNode rightNeighbour = moving.getNext();
 
         leftNeighbour.setNext(moving.getNext());
-        moving.setNext((target.getNext()));
+        if (rightNeighbour != null) rightNeighbour.setPrev(leftNeighbour);
 
         //leftneighbour should inherit children of moving
         BlockNode temp = leftNeighbour.getNext();
@@ -127,7 +131,10 @@ public class BlockDLL implements ICRDT<BlockNode> {
             temp = temp.getNext();
         }
 
+        moving.setNext(targetNext);
+        moving.setPrev(target);
         target.setNext(moving);
+        if (targetNext != null) targetNext.setPrev(moving);
         moving.setDepth(target.getDepth()+1); //it is a child of target to be directly after
         moving.setParentID(target.getBlockID());
 
