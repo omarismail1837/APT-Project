@@ -157,14 +157,25 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
     //auto merge and split
     //if line count > 10 then split block - should be checked when inserting and pasting
-    public void autosplit(String blockID) {
+    public void autosplit(int siteID, long clock, String blockID) {
+        //split lines after 10th and merge to the one after
+        //if it cant fit in block after then split block after and merge....
         BlockNode updatedBlock = map.get(blockID);
+
         if (updatedBlock == null) return;
 
         if (updatedBlock.getContent().getLineCount() <= 10) return;
+        String CharID = updatedBlock.getContent().getCharIDAtLine(10);
+        if (CharID == null) return;
+        BlockNode newBlock = splitBlock(siteID, clock, blockID, CharID);
+        if (newBlock == null) return;
 
-        //split lines after 10th and merge to the one after
-        //if it cant fit in block after then split block after and merge....
+        BlockNode nextBlock = newBlock.getNext();
+        while (nextBlock != null && nextBlock.isDeleted())
+            nextBlock = nextBlock.getNext();
+        if (nextBlock == null) return;
+        mergeBlocks(newBlock.getBlockID(), nextBlock.getBlockID());
+        autosplit(siteID, clock + 1, newBlock.getBlockID());
 
     }
 

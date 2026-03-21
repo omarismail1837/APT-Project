@@ -171,4 +171,17 @@ public class CharDLL implements ICRDT<CharNode> {
         return newDLL;
     }
     public CharNode getHead() { return head; }
+    public String getCharIDAtLine(int lineNumber) {
+        int count = 0;
+        CharNode ptr = head.getNext();
+        while (ptr != null) {
+            if (!ptr.isDeleted() && ptr.getContent() == '\n') {
+                count++;
+                if (count == lineNumber && ptr.getNext() != null)
+                    return ptr.getNext().getCharID();
+            }
+            ptr = ptr.getNext();
+        }
+        return null;
+    }
 }
