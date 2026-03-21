@@ -13,8 +13,8 @@ public class BlockNode {
     private int depth;
     private boolean isDeleted;
     private BlockNode next;
+    private BlockNode prev;
     private String parentID; // null if parent is root
-
 
     public BlockNode(int siteID, long clock, long time, CharDLL content, String parentID)
     {
@@ -45,8 +45,11 @@ public class BlockNode {
     public BlockNode getNext() { return this.next; }
     public int getDepth() { return this.depth; }
     public CharDLL copyContent(int SiteID,long clock,long time) { return this.content.copy(SiteID,clock,time); }
+    public BlockNode getPrev() { return this.prev; }
+
 
     public void setNext(BlockNode n) { this.next = n; }
+    public void setPrev(BlockNode p) { this.prev = p; }
     public void delete() { this.isDeleted = true; } // Mark as tombstone
     public void setDepth(int depth) { this.depth = depth; }
     public void setParentID(String parentID) { this.parentID = parentID; }

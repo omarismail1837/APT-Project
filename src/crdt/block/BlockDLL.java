@@ -43,7 +43,10 @@ public class BlockDLL implements ICRDT<BlockNode> {
         }
 
         b.setNext(rightNeighbour);
+        b.setPrev(leftNeighbour);
         leftNeighbour.setNext(b);
+        if (rightNeighbour != null)
+            rightNeighbour.setPrev(b);
     }
 
     @Override
@@ -91,20 +94,18 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         if (moving == null || target == null) return;
 
-        BlockNode leftneighbour = map.get(moving.getParentID());
-        while (leftneighbour.getNext() != moving)
-            leftneighbour = leftneighbour.getNext();
+        BlockNode leftNeighbour = moving.getPrev();
 
-        leftneighbour.setNext(moving.getNext());
+        leftNeighbour.setNext(moving.getNext());
         moving.setNext((target.getNext()));
 
         //leftneighbour should inherit children of moving
-        BlockNode temp = leftneighbour.getNext();
+        BlockNode temp = leftNeighbour.getNext();
         int movingDepth = moving.getDepth();
         String movingID = moving.getBlockID();
         while (temp != null && temp.getDepth() > movingDepth) { //while temp is a child of moving
             if (temp.getParentID().equals(movingID))
-               temp.setParentID(leftneighbour.getBlockID());
+               temp.setParentID(leftNeighbour.getBlockID());
 
             temp.setDepth(temp.getDepth()-1);
             temp = temp.getNext();
@@ -144,5 +145,40 @@ public class BlockDLL implements ICRDT<BlockNode> {
     }
 
     //auto merge and split
+    //if line count > 10 then split block - should be checked when inserting and pasting
+    public void autosplit(String blockID) {
+        BlockNode updatedBlock = map.get(blockID);
+        if (updatedBlock == null) return;
+
+        if (updatedBlock.getContent().getLineCount() <= 10) return;
+
+        //split lines after 10th and merge to the one after
+        //if it cant fit in block after then split block after and merge....
+
+    }
+
+    //if line count < 2 then merge block with block before or after - should be checked when deleting
+    public void automerge(String blockID) {
+        BlockNode updatedBlock = map.get(blockID);
+        if (updatedBlock == null) return;
+        int currentLineCount = updatedBlock.getContent().getLineCount();
+        if (currentLineCount >= 2) return;
+
+        //get previous not deleted block
+        BlockNode previousBlock = updatedBlock.getPrev();
+        while (previousBlock.isDeleted()) {previousBlock = previousBlock.getPrev();}
+        if (previousBlock.getContent().getLineCount() <= (10 - currentLineCount)) {
+            //merge
+        }
+
+        //get next not deleted block
+        BlockNode nextBlock = updatedBlock.getNext();
+        while (nextBlock.isDeleted()) {nextBlock = nextBlock.getNext();}
+        if (nextBlock.getContent().getLineCount() <= (10 - currentLineCount)) {
+            //merge
+        }
+
+        //if it cant be merged to block before or block after
+    }
 
 }

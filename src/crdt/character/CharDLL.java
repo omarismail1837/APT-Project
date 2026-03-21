@@ -16,6 +16,8 @@ public class CharDLL implements ICRDT<CharNode> {
         lineCount = 0;
     }
 
+    public int getLineCount() { return lineCount; }
+
     @Override
     public void insert(CharNode node) {
         // Find parent
@@ -52,9 +54,10 @@ public class CharDLL implements ICRDT<CharNode> {
         }
 
         node.setNext(rightNeighbour);
+        node.setPrev(leftNeighbour);
         leftNeighbour.setNext(node);
-
-        if (node.getContent() == '\n') lineCount++;
+        if (rightNeighbour != null)
+            rightNeighbour.setPrev(node);
     }
 
     @Override
