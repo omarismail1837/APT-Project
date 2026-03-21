@@ -48,6 +48,8 @@ public class CharNode {
     public String getParentID() { return this.parentID; }
     public CharNode getNext() { return this.next; }
     public int getDepth() { return this.depth; }
+    public boolean getBold() {return this.isBold; }
+    public boolean getItalic() {return this.isItalic; }
 
     public int getSiteID() { return this.siteID; }
     public long getClock() { return this.clock; }

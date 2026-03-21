@@ -1,5 +1,6 @@
 package crdt.block;
 
+import crdt.character.CharDLL;
 import crdt.character.ICRDT;
 import java.util.HashMap;
 
@@ -113,6 +114,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
         moving.setDepth(target.getDepth()+1); //it is a child of target to be directly after
         moving.setParentID(target.getBlockID());
 
+    }
+
+    public CharDLL copyBlock(String BlockID, int SiteID, long clock,long time) {
+        BlockNode original = map.get(BlockID);
+        return original.copyContent(SiteID,clock,time);
     }
 
 

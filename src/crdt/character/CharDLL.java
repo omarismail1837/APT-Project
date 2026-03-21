@@ -3,7 +3,7 @@ package crdt.character;
 import java.util.HashMap;
 
 public class CharDLL implements ICRDT<CharNode> {
-    private CharNode head; // sentinel
+    private final CharNode head; // sentinel
     private HashMap<String, CharNode> map;
 
     public CharDLL()
@@ -98,6 +98,7 @@ public class CharDLL implements ICRDT<CharNode> {
         }
         return newDLL;
     }
+
    //function needed in block operations to merge two blocks
     public void mergeInto(CharDLL other) {
         CharNode ptr = head.getNext();
@@ -124,4 +125,21 @@ public class CharDLL implements ICRDT<CharNode> {
             otherPtr = otherPtr.getNext();
         }
     }
+
+    //function needed in block operations to copy
+    public CharDLL copy(int SiteID,long clock,long time) {
+        CharDLL clone = new CharDLL();
+
+        CharNode temp = head.getNext(); //start from the node after head (the first node after root)
+        String parentID = head.getCharID(); //all heads (roots) have same ID
+        while (temp != null) {
+            //make a copy of temp charnode and insert into clone
+            CharNode newNode = new CharNode(SiteID,clock++,time,temp.getContent(),parentID,temp.getBold(), temp.getItalic());
+            parentID = newNode.getCharID();
+            clone.insert(newNode);
+            temp = temp.getNext();
+        }
+        return clone;
+    }
+
 }

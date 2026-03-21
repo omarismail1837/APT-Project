@@ -44,6 +44,7 @@ public class BlockNode {
     public String getParentID() { return this.parentID; }
     public BlockNode getNext() { return this.next; }
     public int getDepth() { return this.depth; }
+    public CharDLL copyContent(int SiteID,long clock,long time) { return this.content.copy(SiteID,clock,time); }
 
     public void setNext(BlockNode n) { this.next = n; }
     public void delete() { this.isDeleted = true; } // Mark as tombstone
