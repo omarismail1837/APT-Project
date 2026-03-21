@@ -121,7 +121,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
         return original.copyContent(SiteID,clock,time);
     }
 
-
+    public void pasteBlock(CharDLL pasted, BlockNode target, int SiteID, long clock, long time) {
+        if (!map.containsValue(target)) return;
+        BlockNode newBlock = new BlockNode(SiteID, clock, time, pasted.copy(SiteID, clock+1, time), target.getBlockID());
+        insert(newBlock);
+    }
 
     @Override
     public String collectText() {
