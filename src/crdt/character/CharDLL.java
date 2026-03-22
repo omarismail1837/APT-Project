@@ -12,7 +12,7 @@ public class CharDLL implements ICRDT<CharNode> {
         head = new CharNode(siteID, clock, time, '\0', "ROOT");
         head.setNext(null);
         map = new HashMap<>();
-        map.put("ROOT", head);
+        map.put(head.getCharID(), head);
         lineCount = 0;
     }
 
@@ -90,7 +90,7 @@ public class CharDLL implements ICRDT<CharNode> {
         CharDLL newDLL = new CharDLL(siteID, clock, time);
         CharNode ptr = map.get(charID);
         if (ptr == null) return newDLL;
-        String prevID = "ROOT";
+        String prevID = newDLL.head.getCharID();
         while (ptr != null) {
             if (!ptr.isDeleted()) {
                 CharNode newNode = new CharNode(
@@ -113,14 +113,15 @@ public class CharDLL implements ICRDT<CharNode> {
 
    //function needed in block operations to merge two blocks
     public void mergeInto(CharDLL other) {
-        CharNode ptr = head.getNext();
-        CharNode lastNode = null;
-        while (ptr != null) {
-            if (!ptr.isDeleted()) lastNode = ptr;
-            ptr = ptr.getNext();
+        //get last node from current chardll
+        CharNode lastNode = head.getNext();
+
+        while (lastNode != null) {
+            if (lastNode.getNext() == null) break;
+            lastNode = lastNode.getNext();
         }
 
-        String prevID = lastNode == null ? "ROOT" : lastNode.getCharID();
+        String prevID = (lastNode == null? head.getCharID(): lastNode.getCharID());
         CharNode otherPtr = other.head.getNext();
         while (otherPtr != null) {
             if (!otherPtr.isDeleted()) {
