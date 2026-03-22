@@ -115,12 +115,13 @@ public class CharDLL implements ICRDT<CharNode> {
     public void mergeInto(CharDLL other) {
         //get last node from current chardll
         CharNode lastNode = head.getNext();
+
         while (lastNode != null) {
             if (lastNode.getNext() == null) break;
             lastNode = lastNode.getNext();
         }
 
-        String prevID = lastNode.getCharID();
+        String prevID = (lastNode == null? head.getCharID(): lastNode.getCharID());
         CharNode otherPtr = other.head.getNext();
         while (otherPtr != null) {
             if (!otherPtr.isDeleted()) {
