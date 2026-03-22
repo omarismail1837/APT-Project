@@ -95,7 +95,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
         if (first == null || second == null) return;
         if (first.isDeleted() || second.isDeleted()) return;
-        CharNode ptr = second.getContent().getHead().getNext();
+        CharNode ptr = second.getContent().getHead();
         while (ptr != null) {
             charBlockMap.put(ptr.getCharID(), firstBlockID);
             ptr = ptr.getNext();
@@ -269,17 +269,14 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (endCharID != null && endBlockID == null) return null;
         CharDLL result = new CharDLL(siteID, clock, time);
         BlockNode currentBlock = map.get(startBlockID);
-
+        long[] clockRef = { clock };
         while (currentBlock != null) {
             if (!currentBlock.isDeleted()) {
                 String start = currentBlock.getBlockID().equals(startBlockID) ? startCharID : null;
                 String end = currentBlock.getBlockID().equals(endBlockID) ? endCharID : null;
-
-                CharDLL blockCopy = currentBlock.getContent().copy(siteID, clock, time, start, end);
+                clockRef[0]++;
+                CharDLL blockCopy = currentBlock.getContent().copy(siteID, clockRef, time, start, end);
                 result.mergeInto(blockCopy);
-
-                CharNode c = blockCopy.getHead().getNext();
-                while (c != null) { clock++; c = c.getNext(); }
             }
             if (currentBlock.getBlockID().equals(endBlockID)) break;
             currentBlock = currentBlock.getNext();
