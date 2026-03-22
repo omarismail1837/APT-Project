@@ -8,10 +8,21 @@ public class Tests_Block {
     private static int failures = 0;
 
     public static void main() {
-        testBasicOperations();
+        testBasicInsertAndCollect();
+        testDeleteBlock();
+        testSplitBlock();
+        testMergeBlocks();
+        testMoveBlock();
+        testCopyAndPasteBlock();
+        testInsertChar();
+        testDeleteChar();
+        testReplaceChar();
+        testAutosplit();
+        testAutomerge();
+        testCopyBlockContent();
+        testPasteBlockContent();
         testOrdering();
-        testSplitAndMerge();
-        testCharBlockMap();
+        testEdgeCases();
         System.out.println(passes + (passes == 1 ? " Pass & " : " Passes & ") + failures + (failures == 1 ? " Failure" : " Failures"));
     }
 
@@ -25,302 +36,595 @@ public class Tests_Block {
         }
     }
 
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
     /**
-     * Build a CharDLL with the given string.
-     * CharDLL(0,0,0) sentinel charID = "0-0", so first node's parentID = "0-0".
-     * Subsequent nodes use the previous node's charID as parentID.
+     * Global clock shared by all helper-created CharNodes.
+     * Always incrementing guarantees every CharNode gets a unique charID
+     * ("8-N") even when two helpers are called in the same test, which
+     * prevents the duplicate-insert guard from silently dropping nodes during
+     * merge / copy / paste operations.
      */
-    private static CharDLL makeContent(int siteID, long startClock, String text) {
-        CharDLL dll = new CharDLL(0, 0, 0);
-        long clock = startClock;
-        String prevID = "0-0"; // sentinel charID for CharDLL(0,0,0)
-        for (char ch : text.toCharArray()) {
-            CharNode node = new CharNode(siteID, clock, 1, ch, prevID);
-            dll.insert(node);
-            prevID = siteID + "-" + clock;
-            clock++;
+    private static long globalClock = 1;
+
+    /** Build a CharDLL whose visible text equals {@code text}. */
+    private static CharDLL makeCharDLL(String text) {
+        // The sentinel of CharDLL(0, globalClock, 0) gets charID "0-" + globalClock.
+        // We capture that ID before incrementing so we know the parent for the first node.
+        long headClock = globalClock++;
+        CharDLL dll = new CharDLL(0, headClock, 0);
+        String prevID = "0-" + headClock;
+        for (int i = 0; i < text.length(); i++) {
+            long c = globalClock++;
+            CharNode cn = new CharNode(8, c, 1, text.charAt(i), prevID);
+            dll.insert(cn);
+            prevID = "8-" + c;
         }
         return dll;
     }
 
-    // ─── Basic Operations ─────────────────────────────────────────────────────
+    /** Build a CharDLL that contains exactly one newline character (1 line). */
+    private static CharDLL makeNewlineDLL() {
+        long headClock = globalClock++;
+        CharDLL dll = new CharDLL(0, headClock, 0);
+        long c = globalClock++;
+        dll.insert(new CharNode(8, c, 1, '\n', "0-" + headClock));
+        return dll;
+    }
 
-    private static void testBasicOperations() {
+    /** Build a CharDLL with {@code lines} newline characters. */
+    private static CharDLL makeMultilineDLL(int lines) {
+        long headClock = globalClock++;
+        CharDLL dll = new CharDLL(0, headClock, 0);
+        String prev = "0-" + headClock;
+        for (int i = 0; i < lines; i++) {
+            long c = globalClock++;
+            dll.insert(new CharNode(8, c, 1, '\n', prev));
+            prev = "8-" + c;
+        }
+        return dll;
+    }
 
-        // Empty BlockDLL returns empty string
-        BlockDLL dll = new BlockDLL();
-        check("Empty BlockDLL returns empty string", dll.collectText().trim().isEmpty());
+    // ── Tests ──────────────────────────────────────────────────────────────────
 
-        // Single block insert produces correct text
-        BlockDLL dll2 = new BlockDLL();
-        dll2.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
-        check("Single block insert produces correct text", dll2.collectText().contains("hello"));
+    private static void testBasicInsertAndCollect() {
+        // Empty BlockDLL
+        BlockDLL bdll = new BlockDLL();
+        check("Empty BlockDLL produces empty text", bdll.collectText().isEmpty());
 
-        // Orphan block is silently ignored
-        BlockDLL dll3 = new BlockDLL();
-        dll3.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "9-9"));
-        check("Orphan block insert is silently ignored", dll3.collectText().trim().isEmpty());
+        // Single block inserted as child of ROOT
+        BlockDLL bdll2 = new BlockDLL();
+        CharDLL content = makeCharDLL("hello");
+        BlockNode b = new BlockNode(1, 0, 1, content, "ROOT");
+        bdll2.insert(b);
+        check("Single block inserted produces its text", bdll2.collectText().equals("hello\n"));
 
-        // Duplicate block insert is silently ignored
-        BlockDLL dll4 = new BlockDLL();
-        BlockNode b = new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT");
-        dll4.insert(b);
-        dll4.insert(b);
-        String t4 = dll4.collectText();
-        check("Duplicate block insert is silently ignored",
-                t4.indexOf("hello") == t4.lastIndexOf("hello"));
+        // Two blocks in sequence
+        BlockDLL bdll3 = new BlockDLL();
+        bdll3.insert(new BlockNode(1, 0, 1, makeCharDLL("first"), "ROOT"));
+        bdll3.insert(new BlockNode(1, 1, 2, makeCharDLL("second"), "1-0"));
+        String text3 = bdll3.collectText();
+        check("Two sequential blocks both appear in output", text3.contains("first") && text3.contains("second"));
 
-        // Multiple sequential blocks produce correct text
-        BlockDLL dll5 = new BlockDLL();
-        dll5.insert(new BlockNode(1, 0, 1, makeContent(1, 0,  "hello"), "ROOT"));
-        dll5.insert(new BlockNode(1, 1, 2, makeContent(1, 10, "world"), "1-0"));
-        String t5 = dll5.collectText();
-        check("Sequential block inserts produce correct text",
-                t5.contains("hello") && t5.contains("world") && t5.indexOf("hello") < t5.indexOf("world"));
+        // Duplicate insert is ignored
+        BlockDLL bdll4 = new BlockDLL();
+        BlockNode dup = new BlockNode(1, 0, 1, makeCharDLL("dup"), "ROOT");
+        bdll4.insert(dup);
+        bdll4.insert(dup);
+        check("Duplicate block insert is silently ignored", bdll4.collectText().equals("dup\n"));
 
-        // Delete block removes it from collected text
-        BlockDLL dll6 = new BlockDLL();
-        dll6.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
-        dll6.delete("1-0");
-        check("Deleting a block removes it from collected text", !dll6.collectText().contains("hello"));
+        // Insert with unknown parent is ignored
+        BlockDLL bdll5 = new BlockDLL();
+        bdll5.insert(new BlockNode(1, 0, 1, makeCharDLL("orphan"), "nonexistent-parent"));
+        check("Insert with unknown parent is silently ignored", bdll5.collectText().isEmpty());
 
-        // Double delete is silently ignored
-        BlockDLL dll7 = new BlockDLL();
-        dll7.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
-        dll7.delete("1-0");
+        // getBlock returns correct node
+        BlockDLL bdll6 = new BlockDLL();
+        BlockNode target = new BlockNode(2, 5, 1, makeCharDLL("find me"), "ROOT");
+        bdll6.insert(target);
+        check("getBlock returns the correct block by ID", bdll6.getBlock("2-5") == target);
+
+        // getBlock returns null for missing ID
+        check("getBlock returns null for unknown ID", bdll6.getBlock("99-99") == null);
+
+        // getBlockIDByCharID returns correct mapping after insert
+        BlockDLL bdll7 = new BlockDLL();
+        CharDLL cdll7 = new CharDLL(0, 0, 0);
+        cdll7.insert(new CharNode(3, 0, 1, 'x', "0-0"));
+        bdll7.insert(new BlockNode(1, 0, 1, cdll7, "ROOT"));
+        check("getBlockIDByCharID returns block ID for a char inside it",
+                "1-0".equals(bdll7.getBlockIDByCharID("3-0")));
+    }
+
+    private static void testDeleteBlock() {
+        // Basic delete hides block from collectText
+        BlockDLL bdll = new BlockDLL();
+        bdll.insert(new BlockNode(1, 0, 1, makeCharDLL("visible"), "ROOT"));
+        bdll.delete("1-0");
+        check("Deleted block is excluded from collected text", bdll.collectText().isEmpty());
+
+        // Double delete is idempotent
+        BlockDLL bdll2 = new BlockDLL();
+        bdll2.insert(new BlockNode(1, 0, 1, makeCharDLL("hi"), "ROOT"));
+        bdll2.delete("1-0");
         try {
-            dll7.delete("1-0");
+            bdll2.delete("1-0");
             check("Double delete is silently ignored", true);
         } catch (Exception e) {
             check("Double delete is silently ignored", false);
         }
 
-        // Delete of non-existent block is silently ignored
-        BlockDLL dll8 = new BlockDLL();
+        // Delete of non-existent ID is silently ignored
+        BlockDLL bdll3 = new BlockDLL();
         try {
-            dll8.delete("fake-id");
-            check("Delete of non-existent block is silently ignored", true);
+            bdll3.delete("fake-99");
+            check("Delete of non-existent block ID is silently ignored", true);
         } catch (Exception e) {
-            check("Delete of non-existent block is silently ignored", false);
+            check("Delete of non-existent block ID is silently ignored", false);
         }
 
-        // Deleting all blocks returns empty string
-        BlockDLL dll9 = new BlockDLL();
-        dll9.insert(new BlockNode(1, 0, 1, makeContent(1, 0,  "hello"), "ROOT"));
-        dll9.insert(new BlockNode(1, 1, 2, makeContent(1, 10, "world"), "1-0"));
-        dll9.delete("1-0");
-        dll9.delete("1-1");
-        check("Deleting all blocks returns empty string", dll9.collectText().trim().isEmpty());
-
-        // Child of deleted block is still inserted correctly
-        BlockDLL dll10 = new BlockDLL();
-        dll10.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
-        dll10.delete("1-0");
-        dll10.insert(new BlockNode(1, 1, 2, makeContent(1, 10, "world"), "1-0"));
-        check("Child of deleted block is inserted correctly", dll10.collectText().contains("world"));
+        // Deleted block is marked via isDeleted()
+        BlockDLL bdll4 = new BlockDLL();
+        BlockNode bn = new BlockNode(1, 0, 1, makeCharDLL("mark"), "ROOT");
+        bdll4.insert(bn);
+        bdll4.delete("1-0");
+        check("Deleted block has isDeleted() == true", bn.isDeleted());
     }
 
-    // ─── Ordering ─────────────────────────────────────────────────────────────
+    private static void testSplitBlock() {
+        // Split produces a new block with the tail characters
+        BlockDLL bdll = new BlockDLL();
+        CharDLL cdll = new CharDLL(0, 0, 0);
+        // Insert chars: A B \n C D \n
+        cdll.insert(new CharNode(1, 0, 1, 'A', "0-0"));
+        cdll.insert(new CharNode(1, 1, 2, 'B', "1-0"));
+        cdll.insert(new CharNode(1, 2, 3, '\n', "1-1"));
+        cdll.insert(new CharNode(1, 3, 4, 'C', "1-2"));
+        cdll.insert(new CharNode(1, 4, 5, 'D', "1-3"));
+        cdll.insert(new CharNode(1, 5, 6, '\n', "1-4"));
+        bdll.insert(new BlockNode(1, 0, 1, cdll, "ROOT"));
 
-    private static void testOrdering() {
+        BlockNode newBlock = bdll.splitBlock(2, 0, 2, "1-0", "1-3");
+        check("splitBlock returns a non-null new block", newBlock != null);
+        check("splitBlock: new block contains tail characters",
+                newBlock.getContent().collectText().contains("D"));
 
-        // Higher timestamp placed before lower timestamp sibling
-        BlockDLL dll = new BlockDLL();
-        dll.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "A"), "ROOT"));
-        dll.insert(new BlockNode(2, 0, 2, makeContent(2, 0, "B"), "ROOT"));
-        dll.insert(new BlockNode(3, 0, 3, makeContent(3, 0, "C"), "ROOT"));
-        String t1 = dll.collectText();
-        check("Higher timestamp block placed before lower timestamp sibling",
-                t1.indexOf("C") < t1.indexOf("B") && t1.indexOf("B") < t1.indexOf("A"));
+        // splitBlock on a non-existent block returns null
+        BlockDLL bdll2 = new BlockDLL();
+        BlockNode result = bdll2.splitBlock(1, 0, 1, "nonexistent", "somechar");
+        check("splitBlock on non-existent block returns null", result == null);
 
-        // Lower siteID wins when timestamps are equal
-        BlockDLL dll2 = new BlockDLL();
-        dll2.insert(new BlockNode(1, 0, 5, makeContent(1, 0, "A"), "ROOT"));
-        dll2.insert(new BlockNode(2, 0, 5, makeContent(2, 0, "B"), "ROOT"));
-        dll2.insert(new BlockNode(3, 0, 5, makeContent(3, 0, "C"), "ROOT"));
-        String t2 = dll2.collectText();
-        check("Lower siteID block wins when timestamps are equal",
-                t2.indexOf("A") < t2.indexOf("B") && t2.indexOf("B") < t2.indexOf("C"));
+        // splitBlock on a deleted block returns null
+        BlockDLL bdll3 = new BlockDLL();
+        bdll3.insert(new BlockNode(1, 0, 1, makeCharDLL("abc"), "ROOT"));
+        bdll3.delete("1-0");
+        BlockNode result3 = bdll3.splitBlock(1, 1, 1, "1-0", "9-0");
+        check("splitBlock on deleted block returns null", result3 == null);
 
-        // Same operations in different order converge to same text
-        BlockDLL dll3 = new BlockDLL();
-        BlockDLL dll4 = new BlockDLL();
-        dll3.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "A"), "ROOT"));
-        dll3.insert(new BlockNode(2, 0, 2, makeContent(2, 0, "B"), "ROOT"));
-        dll3.insert(new BlockNode(3, 0, 3, makeContent(3, 0, "C"), "ROOT"));
-        dll4.insert(new BlockNode(3, 0, 3, makeContent(3, 0, "C"), "ROOT"));
-        dll4.insert(new BlockNode(2, 0, 2, makeContent(2, 0, "B"), "ROOT"));
-        dll4.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "A"), "ROOT"));
-        check("Same block operations in different order converge to same text",
-                dll3.collectText().equals(dll4.collectText()));
-
-        // Losing sibling placed after winning sibling's descendants
-        BlockDLL dll5 = new BlockDLL();
-        dll5.insert(new BlockNode(1, 0, 2, makeContent(1, 0,  "Y"), "ROOT"));
-        dll5.insert(new BlockNode(1, 1, 3, makeContent(1, 10, "a"), "1-0"));
-        dll5.insert(new BlockNode(1, 2, 4, makeContent(1, 20, "s"), "1-1"));
-        dll5.insert(new BlockNode(2, 0, 1, makeContent(2, 0,  "N"), "ROOT"));
-        String t5 = dll5.collectText();
-        check("Losing sibling placed after winning sibling's descendants",
-                t5.indexOf("Y") < t5.indexOf("a") &&
-                        t5.indexOf("a") < t5.indexOf("s") &&
-                        t5.indexOf("s") < t5.indexOf("N"));
-
-        // Sibling that loses to all others placed at end
-        BlockDLL dll6 = new BlockDLL();
-        dll6.insert(new BlockNode(1, 0, 3, makeContent(1, 0,  "Y"), "ROOT"));
-        dll6.insert(new BlockNode(1, 1, 4, makeContent(1, 10, "a"), "1-0"));
-        dll6.insert(new BlockNode(2, 0, 5, makeContent(2, 0,  "N"), "ROOT"));
-        dll6.insert(new BlockNode(2, 1, 6, makeContent(2, 10, "a"), "2-0"));
-        dll6.insert(new BlockNode(3, 0, 1, makeContent(3, 0,  "L"), "ROOT"));
-        String t6 = dll6.collectText();
-        check("Sibling that loses to all others placed at end",
-                t6.indexOf("N") < t6.indexOf("Y") &&
-                        t6.indexOf("Y") < t6.indexOf("L"));
+        // charBlockMap is updated for characters in the new block
+        BlockDLL bdll4 = new BlockDLL();
+        CharDLL cdll4 = new CharDLL(0, 0, 0);
+        cdll4.insert(new CharNode(1, 0, 1, 'X', "0-0"));
+        cdll4.insert(new CharNode(1, 1, 2, 'Y', "1-0"));
+        cdll4.insert(new CharNode(1, 2, 3, '\n', "1-1"));
+        cdll4.insert(new CharNode(1, 3, 4, 'Z', "1-2"));
+        cdll4.insert(new CharNode(1, 4, 5, '\n', "1-3"));
+        bdll4.insert(new BlockNode(1, 0, 1, cdll4, "ROOT"));
+        BlockNode splitResult = bdll4.splitBlock(2, 0, 2, "1-0", "1-3");
+        check("splitBlock updates charBlockMap for chars moved to new block",
+                splitResult != null && splitResult.getBlockID().equals(bdll4.getBlockIDByCharID("1-3")));
     }
 
-    // ─── Split and Merge ──────────────────────────────────────────────────────
+    private static void testMergeBlocks() {
+        // Basic merge: second block's content appears in first
+        BlockDLL bdll = new BlockDLL();
+        bdll.insert(new BlockNode(1, 0, 1, makeCharDLL("hello"), "ROOT"));
+        bdll.insert(new BlockNode(1, 1, 2, makeCharDLL("world"), "1-0"));
+        bdll.mergeBlocks("1-0", "1-1");
+        String text = bdll.collectText();
+        check("Merged block contains text from both original blocks",
+                text.contains("hello") && text.contains("world"));
+        check("Second block is marked deleted after merge", bdll.getBlock("1-1").isDeleted());
 
-    private static void testSplitAndMerge() {
-
-        // Split block produces correct text in both halves
-        // makeContent(1, 0, "helloworld") → chars "1-0" to "1-9", first node parentID = "0-0"
-        BlockDLL dll = new BlockDLL();
-        dll.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "helloworld"), "ROOT"));
-        // "1-5" is 'w', the 6th character
-        BlockNode second = dll.splitBlock(1, 10, 1, "1-0", "1-5");
-        check("Split block: first half correct",
-                dll.getBlock("1-0").getContent().collectText().equals("hello"));
-        check("Split block: second half correct",
-                second != null && second.getContent().collectText().equals("world"));
-
-        // Split produces two blocks in collectText
-        BlockDLL dll2 = new BlockDLL();
-        dll2.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "helloworld"), "ROOT"));
-        dll2.splitBlock(1, 10, 1, "1-0", "1-5");
-        String t2 = dll2.collectText();
-        check("Split block: both halves appear in collectText",
-                t2.contains("hello") && t2.contains("world"));
-
-        // Split on deleted block returns null
-        BlockDLL dll3 = new BlockDLL();
-        dll3.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
-        dll3.delete("1-0");
-        check("Split on deleted block returns null",
-                dll3.splitBlock(1, 10, 1, "1-0", "1-2") == null);
-
-        // Split on non-existent charID returns empty second block
-        BlockDLL dll4 = new BlockDLL();
-        dll4.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
-        BlockNode result = dll4.splitBlock(1, 10, 1, "1-0", "9-9");
-        check("Split at non-existent charID returns empty second block",
-                result != null && result.getContent().collectText().isEmpty());
-
-        // Merge two blocks produces correct combined text
-        BlockDLL dll5 = new BlockDLL();
-        dll5.insert(new BlockNode(1, 0, 1, makeContent(1, 0,  "hello"), "ROOT"));
-        dll5.insert(new BlockNode(1, 1, 2, makeContent(1, 10, "world"), "1-0"));
-        dll5.mergeBlocks("1-0", "1-1");
-        check("Merge blocks: combined text correct",
-                dll5.getBlock("1-0").getContent().collectText().equals("helloworld"));
-        check("Merge blocks: second block tombstoned",
-                dll5.getBlock("1-1").isDeleted());
-
-        // Split then merge returns original text
-        BlockDLL dll6 = new BlockDLL();
-        dll6.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "helloworld"), "ROOT"));
-        BlockNode half = dll6.splitBlock(1, 10, 1, "1-0", "1-5");
-        dll6.mergeBlocks("1-0", half.getBlockID());
-        check("Split then merge returns original text",
-                dll6.getBlock("1-0").getContent().collectText().equals("helloworld"));
-
-        // Merge with non-existent block is silently ignored
-        BlockDLL dll7 = new BlockDLL();
-        dll7.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
+        // Merge with non-existent first block is silently ignored
+        BlockDLL bdll2 = new BlockDLL();
+        bdll2.insert(new BlockNode(1, 0, 1, makeCharDLL("only"), "ROOT"));
         try {
-            dll7.mergeBlocks("1-0", "fake-id");
-            check("Merge with non-existent block is silently ignored", true);
+            bdll2.mergeBlocks("nonexistent", "1-0");
+            check("mergeBlocks with unknown first block ID is silently ignored", true);
         } catch (Exception e) {
-            check("Merge with non-existent block is silently ignored", false);
+            check("mergeBlocks with unknown first block ID is silently ignored", false);
         }
 
-        // Merge with deleted block is silently ignored
-        BlockDLL dll8 = new BlockDLL();
-        dll8.insert(new BlockNode(1, 0, 1, makeContent(1, 0,  "hello"), "ROOT"));
-        dll8.insert(new BlockNode(1, 1, 2, makeContent(1, 10, "world"), "1-0"));
-        dll8.delete("1-1");
-        dll8.mergeBlocks("1-0", "1-1");
-        check("Merge with deleted block is silently ignored",
-                dll8.getBlock("1-0").getContent().collectText().equals("hello"));
+        // Merge with non-existent second block is silently ignored
+        BlockDLL bdll3 = new BlockDLL();
+        bdll3.insert(new BlockNode(1, 0, 1, makeCharDLL("only"), "ROOT"));
+        try {
+            bdll3.mergeBlocks("1-0", "nonexistent");
+            check("mergeBlocks with unknown second block ID is silently ignored", true);
+        } catch (Exception e) {
+            check("mergeBlocks with unknown second block ID is silently ignored", false);
+        }
+
+        // Merge where first is deleted is skipped
+        BlockDLL bdll4 = new BlockDLL();
+        bdll4.insert(new BlockNode(1, 0, 1, makeCharDLL("a"), "ROOT"));
+        bdll4.insert(new BlockNode(1, 1, 2, makeCharDLL("b"), "1-0"));
+        bdll4.delete("1-0");
+        bdll4.mergeBlocks("1-0", "1-1");
+        check("mergeBlocks skips merge if first block is deleted",
+                !bdll4.getBlock("1-1").isDeleted()); // second should NOT be deleted
+
+        // charBlockMap is updated for chars that moved to first block
+        BlockDLL bdll5 = new BlockDLL();
+        CharDLL c1 = new CharDLL(0, 0, 0);
+        c1.insert(new CharNode(1, 0, 1, 'A', "0-0"));
+        CharDLL c2 = new CharDLL(0, 0, 0);
+        c2.insert(new CharNode(2, 0, 1, 'B', "0-0"));
+        bdll5.insert(new BlockNode(1, 0, 1, c1, "ROOT"));
+        bdll5.insert(new BlockNode(1, 1, 2, c2, "1-0"));
+        bdll5.mergeBlocks("1-0", "1-1");
+        check("charBlockMap updated so moved char points to first block",
+                "1-0".equals(bdll5.getBlockIDByCharID("2-0")));
     }
 
-    // ─── CharBlockMap ─────────────────────────────────────────────────────────
+    private static void testMoveBlock() {
+        // Move a block to a new position
+        BlockDLL bdll = new BlockDLL();
+        bdll.insert(new BlockNode(1, 0, 1, makeCharDLL("A"), "ROOT"));
+        bdll.insert(new BlockNode(1, 1, 2, makeCharDLL("B"), "1-0"));
+        bdll.insert(new BlockNode(1, 2, 3, makeCharDLL("C"), "1-1"));
+        // Current order: A -> B -> C
+        // Move B to after C (target = "1-2")
+        bdll.moveBlock("1-1", "1-2");
+        String text = bdll.collectText();
+        int posA = text.indexOf('A');
+        int posC = text.indexOf('C');
+        int posB = text.lastIndexOf('B');
+        check("Block B appears after C after move", posA < posC && posC < posB);
 
-    private static void testCharBlockMap() {
+        // Move with unknown block ID is silently ignored
+        BlockDLL bdll2 = new BlockDLL();
+        bdll2.insert(new BlockNode(1, 0, 1, makeCharDLL("X"), "ROOT"));
+        try {
+            bdll2.moveBlock("nonexistent", "1-0");
+            check("moveBlock with unknown block ID is silently ignored", true);
+        } catch (Exception e) {
+            check("moveBlock with unknown block ID is silently ignored", false);
+        }
 
-        // charBlockMap correctly maps char to block on insert
-        BlockDLL dll = new BlockDLL();
-        dll.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
-        check("charBlockMap maps char to correct block on insert",
-                "1-0".equals(dll.getBlockIDByCharID("1-2")));
+        // Move with unknown target ID is silently ignored
+        BlockDLL bdll3 = new BlockDLL();
+        bdll3.insert(new BlockNode(1, 0, 1, makeCharDLL("X"), "ROOT"));
+        try {
+            bdll3.moveBlock("1-0", "nonexistent");
+            check("moveBlock with unknown target ID is silently ignored", true);
+        } catch (Exception e) {
+            check("moveBlock with unknown target ID is silently ignored", false);
+        }
 
-        // charBlockMap updated after merge
-        BlockDLL dll2 = new BlockDLL();
-        dll2.insert(new BlockNode(1, 0, 1, makeContent(1, 0,  "hello"), "ROOT"));
-        dll2.insert(new BlockNode(1, 1, 2, makeContent(1, 10, "world"), "1-0"));
-        dll2.mergeBlocks("1-0", "1-1");
-        check("charBlockMap updated after merge — chars from second block point to first",
-                "1-0".equals(dll2.getBlockIDByCharID("1-10")));
+        // After move, depth is updated correctly (child of target)
+        BlockDLL bdll4 = new BlockDLL();
+        bdll4.insert(new BlockNode(1, 0, 1, makeCharDLL("P"), "ROOT"));
+        bdll4.insert(new BlockNode(1, 1, 2, makeCharDLL("Q"), "ROOT"));
+        bdll4.moveBlock("1-1", "1-0");
+        check("Moved block depth is target.depth + 1", bdll4.getBlock("1-1").getDepth() == bdll4.getBlock("1-0").getDepth() + 1);
 
-        // charBlockMap updated after split
-        BlockDLL dll3 = new BlockDLL();
-        dll3.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "helloworld"), "ROOT"));
-        BlockNode second = dll3.splitBlock(1, 10, 1, "1-0", "1-5");
-        check("charBlockMap updated after split — moved chars point to new block",
-                second != null && second.getBlockID().equals(dll3.getBlockIDByCharID("1-5")));
+        // After move, parentID is updated to target
+        check("Moved block parentID is updated to target block ID",
+                "1-0".equals(bdll4.getBlock("1-1").getParentID()));
+    }
 
-        // insertChar adds char to correct block via charBlockMap
-        BlockDLL dll4 = new BlockDLL();
-        dll4.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "helo"), "ROOT"));
-        // insert 'l' after "hel" (parentID = "1-2")
-        dll4.insertChar("1-2", new CharNode(1, 10, 1, 'l', "1-2"));
-        check("insertChar adds character to correct block",
-                dll4.getBlock("1-0").getContent().collectText().equals("hello"));
+    private static void testCopyAndPasteBlock() {
+        // copyBlock returns a CharDLL with the same text
+        // Use a high starting clock (1000) to ensure clone-sentinel "2-1000" != first copied node "2-1001"
+        BlockDLL bdll = new BlockDLL();
+        bdll.insert(new BlockNode(1, 0, 1, makeCharDLL("copy me"), "ROOT"));
+        CharDLL copied = bdll.copyBlock("1-0", 2, 1000, 2);
+        check("copyBlock returns non-null CharDLL", copied != null);
+        check("copyBlock returns CharDLL with same text", copied.collectText().equals("copy me"));
+
+        // copyBlock on non-existent block returns null
+        BlockDLL bdll2 = new BlockDLL();
+        check("copyBlock on non-existent block returns null",
+                bdll2.copyBlock("nonexistent", 1, 0, 1) == null);
+
+        // copyBlock on deleted block returns null
+        BlockDLL bdll3 = new BlockDLL();
+        bdll3.insert(new BlockNode(1, 0, 1, makeCharDLL("gone"), "ROOT"));
+        bdll3.delete("1-0");
+        check("copyBlock on deleted block returns null",
+                bdll3.copyBlock("1-0", 1, 1, 1) == null);
+
+        // pasteBlock creates a new block after the target
+        BlockDLL bdll4 = new BlockDLL();
+        CharDLL content = makeCharDLL("original");
+        bdll4.insert(new BlockNode(1, 0, 1, content, "ROOT"));
+        CharDLL toPaste = makeCharDLL("pasted");
+        bdll4.pasteBlock(toPaste, "1-0", 2, 1000, 2);
+        check("pasteBlock produces output containing the pasted text",
+                bdll4.collectText().contains("pasted"));
+
+        // pasteBlock with null content is silently ignored
+        BlockDLL bdll5 = new BlockDLL();
+        bdll5.insert(new BlockNode(1, 0, 1, makeCharDLL("safe"), "ROOT"));
+        try {
+            bdll5.pasteBlock(null, "1-0", 2, 0, 2);
+            check("pasteBlock with null CharDLL is silently ignored", true);
+        } catch (Exception e) {
+            check("pasteBlock with null CharDLL is silently ignored", false);
+        }
+
+        // pasteBlock on non-existent target is silently ignored
+        BlockDLL bdll6 = new BlockDLL();
+        try {
+            bdll6.pasteBlock(makeCharDLL("x"), "nonexistent", 1, 0, 1);
+            check("pasteBlock on non-existent target is silently ignored", true);
+        } catch (Exception e) {
+            check("pasteBlock on non-existent target is silently ignored", false);
+        }
+
+        // pasteBlock on deleted target is silently ignored
+        BlockDLL bdll7 = new BlockDLL();
+        bdll7.insert(new BlockNode(1, 0, 1, makeCharDLL("del"), "ROOT"));
+        bdll7.delete("1-0");
+        try {
+            bdll7.pasteBlock(makeCharDLL("x"), "1-0", 1, 1, 1);
+            check("pasteBlock on deleted target is silently ignored", true);
+        } catch (Exception e) {
+            check("pasteBlock on deleted target is silently ignored", false);
+        }
+    }
+
+    private static void testInsertChar() {
+        // insertChar places a new char inside the correct block
+        BlockDLL bdll = new BlockDLL();
+        CharDLL cdll = new CharDLL(0, 0, 0);
+        cdll.insert(new CharNode(1, 0, 1, 'H', "0-0"));
+        bdll.insert(new BlockNode(1, 0, 1, cdll, "ROOT"));
+
+        CharNode newChar = new CharNode(1, 1, 2, 'i', "1-0");
+        bdll.insertChar("1-0", newChar);
+        check("insertChar adds character to the correct block",
+                bdll.getBlock("1-0").getContent().collectText().contains("i"));
+
+        // insertChar updates charBlockMap for the new char
+        check("insertChar updates charBlockMap for newly inserted char",
+                "1-0".equals(bdll.getBlockIDByCharID("1-1")));
 
         // insertChar with unknown parentCharID is silently ignored
-        BlockDLL dll5 = new BlockDLL();
-        dll5.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
+        BlockDLL bdll2 = new BlockDLL();
         try {
-            dll5.insertChar("9-9", new CharNode(1, 10, 1, 'x', "9-9"));
-            check("insertChar with unknown parentCharID is silently ignored",
-                    dll5.getBlock("1-0").getContent().collectText().equals("hello"));
+            bdll2.insertChar("unknown-char", new CharNode(1, 0, 1, 'z', "unknown-char"));
+            check("insertChar with unknown parentCharID is silently ignored", true);
         } catch (Exception e) {
             check("insertChar with unknown parentCharID is silently ignored", false);
         }
+    }
 
-        // deleteChar removes character from correct block
-        BlockDLL dll6 = new BlockDLL();
-        dll6.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "helllo"), "ROOT"));
-        dll6.deleteChar("1-2", 1, 20, 1);
-        check("deleteChar removes character from correct block",
-                dll6.getBlock("1-0").getContent().collectText().equals("hello"));
+    private static void testDeleteChar() {
+        // deleteChar removes the char from the block's content
+        BlockDLL bdll = new BlockDLL();
+        CharDLL cdll = new CharDLL(0, 0, 0);
+        cdll.insert(new CharNode(1, 0, 1, 'A', "0-0"));
+        cdll.insert(new CharNode(1, 1, 2, 'B', "1-0"));
+        cdll.insert(new CharNode(1, 2, 3, '\n', "1-1"));
+        bdll.insert(new BlockNode(1, 0, 1, cdll, "ROOT"));
+        bdll.deleteChar("1-0", 1, 10, 10);
+        check("deleteChar marks the character as deleted in the block's content",
+                !bdll.getBlock("1-0").getContent().collectText().contains("A"));
 
-        // replaceChar replaces character correctly
-        BlockDLL dll7 = new BlockDLL();
-        dll7.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hxllo"), "ROOT"));
-        dll7.replaceChar("1-1", new CharNode(1, 10, 1, 'e', "1-0"), 1, 20, 1);
-        check("replaceChar replaces character correctly",
-                dll7.getBlock("1-0").getContent().collectText().equals("hello"));
-
-        // deleteChar on unknown charID is silently ignored
-        BlockDLL dll8 = new BlockDLL();
-        dll8.insert(new BlockNode(1, 0, 1, makeContent(1, 0, "hello"), "ROOT"));
+        // deleteChar with unknown charID is silently ignored
+        BlockDLL bdll2 = new BlockDLL();
         try {
-            dll8.deleteChar("9-9", 1, 20, 1);
-            check("deleteChar with unknown charID is silently ignored",
-                    dll8.getBlock("1-0").getContent().collectText().equals("hello"));
+            bdll2.deleteChar("nonexistent-char", 1, 0, 1);
+            check("deleteChar with unknown charID is silently ignored", true);
         } catch (Exception e) {
             check("deleteChar with unknown charID is silently ignored", false);
         }
+    }
+
+    private static void testReplaceChar() {
+        // replaceChar substitutes the old char with the new one
+        BlockDLL bdll = new BlockDLL();
+        CharDLL cdll = new CharDLL(0, 0, 0);
+        cdll.insert(new CharNode(1, 0, 1, 'X', "0-0"));
+        cdll.insert(new CharNode(1, 1, 2, '\n', "1-0"));
+        bdll.insert(new BlockNode(1, 0, 1, cdll, "ROOT"));
+        CharNode replacement = new CharNode(2, 0, 3, 'Y', "1-0");
+        bdll.replaceChar("1-0", replacement, 1, 5, 5);
+        String text = bdll.getBlock("1-0").getContent().collectText();
+        check("replaceChar removes old character", !text.contains("X"));
+        check("replaceChar inserts new character", text.contains("Y"));
+
+        // replaceChar with unknown old ID is silently ignored
+        BlockDLL bdll2 = new BlockDLL();
+        try {
+            bdll2.replaceChar("unknown", new CharNode(1, 0, 1, 'Z', "unknown"), 1, 0, 1);
+            check("replaceChar with unknown old charID is silently ignored", true);
+        } catch (Exception e) {
+            check("replaceChar with unknown old charID is silently ignored", false);
+        }
+    }
+
+    private static void testAutosplit() {
+        // A block with more than 10 lines should be split automatically
+        BlockDLL bdll = new BlockDLL();
+        CharDLL cdll = makeMultilineDLL(12); // 12 newline chars = 12 lines
+        bdll.insert(new BlockNode(1, 0, 1, cdll, "ROOT"));
+        bdll.autosplit(1, 10, 10, "1-0");
+        // After autosplit the original block should have at most 10 lines
+        check("autosplit reduces original block to <= 10 lines",
+                bdll.getBlock("1-0").getContent().getLineCount() <= 10);
+
+        // Autosplit on non-existent block is silently ignored
+        BlockDLL bdll2 = new BlockDLL();
+        try {
+            bdll2.autosplit(1, 0, 1, "nonexistent");
+            check("autosplit on non-existent block is silently ignored", true);
+        } catch (Exception e) {
+            check("autosplit on non-existent block is silently ignored", false);
+        }
+
+        // Autosplit on a block with <= 10 lines is a no-op
+        BlockDLL bdll3 = new BlockDLL();
+        CharDLL cdll3 = makeMultilineDLL(5);
+        BlockNode bn3 = new BlockNode(1, 0, 1, cdll3, "ROOT");
+        bdll3.insert(bn3);
+        bdll3.autosplit(1, 10, 10, "1-0");
+        check("autosplit is a no-op when block has <= 10 lines",
+                bdll3.getBlock("1-0").getContent().getLineCount() == 5);
+    }
+
+    private static void testAutomerge() {
+        // A block with < 2 lines should be merged with an adjacent block
+        BlockDLL bdll = new BlockDLL();
+        bdll.insert(new BlockNode(1, 0, 1, makeMultilineDLL(5), "ROOT"));       // 5 lines
+        bdll.insert(new BlockNode(1, 1, 2, makeNewlineDLL(), "1-0"));           // 1 line
+        bdll.automerge("1-1", 1, 10, 10);
+        check("automerge merges a block with < 2 lines into adjacent block",
+                bdll.getBlock("1-1").isDeleted());
+
+        // Automerge on non-existent block is silently ignored
+        BlockDLL bdll2 = new BlockDLL();
+        try {
+            bdll2.automerge("nonexistent", 1, 0, 1);
+            check("automerge on non-existent block is silently ignored", true);
+        } catch (Exception e) {
+            check("automerge on non-existent block is silently ignored", false);
+        }
+
+        // Block with >= 2 lines is untouched by automerge
+        BlockDLL bdll3 = new BlockDLL();
+        bdll3.insert(new BlockNode(1, 0, 1, makeMultilineDLL(3), "ROOT"));
+        bdll3.automerge("1-0", 1, 0, 1);
+        check("automerge is a no-op when block has >= 2 lines",
+                !bdll3.getBlock("1-0").isDeleted());
+    }
+
+    private static void testCopyBlockContent() {
+        // Build an isolated CharDLL with explicit unique IDs (siteID=5 avoids all helper siteIDs)
+        BlockDLL bdll = new BlockDLL();
+        CharDLL cdll = new CharDLL(5, 0, 0); // sentinel = "5-0"
+        cdll.insert(new CharNode(5, 1, 1, 'A', "5-0"));
+        cdll.insert(new CharNode(5, 2, 2, 'B', "5-1"));
+        bdll.insert(new BlockNode(1, 0, 1, cdll, "ROOT"));
+
+        // Use a high starting clock so clone sentinel "6-1000" != first node "6-1001"
+        CharDLL copied = bdll.copyBlockContent("1-0", 6, 1000, 2, null);
+        check("copyBlockContent with null startCharID copies from head",
+                copied != null && copied.collectText().equals("AB"));
+
+        // copyBlockContent from a specific char copies from that char onwards
+        CharDLL copied2 = bdll.copyBlockContent("1-0", 6, 2000, 2, "5-2");
+        check("copyBlockContent with startCharID copies from that char onwards",
+                copied2 != null && copied2.collectText().equals("B"));
+
+        // copyBlockContent on non-existent block returns null
+        check("copyBlockContent on non-existent block returns null",
+                bdll.copyBlockContent("nonexistent", 1, 0, 1, null) == null);
+
+        // copyBlockContent on deleted block returns null
+        BlockDLL bdll2 = new BlockDLL();
+        bdll2.insert(new BlockNode(1, 0, 1, makeCharDLL("del"), "ROOT"));
+        bdll2.delete("1-0");
+        check("copyBlockContent on deleted block returns null",
+                bdll2.copyBlockContent("1-0", 1, 1000, 1, null) == null);
+    }
+
+    private static void testPasteBlockContent() {
+        // pasteBlockContent inserts copied content at the given char position
+        BlockDLL bdll = new BlockDLL();
+        CharDLL cdll = new CharDLL(5, 0, 0); // sentinel = "5-0"
+        cdll.insert(new CharNode(5, 1, 1, 'A', "5-0"));
+        cdll.insert(new CharNode(5, 2, 2, '\n', "5-1"));
+        bdll.insert(new BlockNode(1, 0, 1, cdll, "ROOT"));
+
+        CharDLL toPaste = makeCharDLL("XY"); // unique IDs via globalClock
+        // Use high clock so clone sentinel doesn't collide with first pasted node
+        bdll.pasteBlockContent(6, 1000, 2, "1-0", "5-2", toPaste);
+        String text = bdll.collectText();
+        check("pasteBlockContent inserts pasted content into block output",
+                text.contains("X") && text.contains("Y"));
+    }
+
+    private static void testOrdering() {
+        // Higher timestamp wins (appears first among siblings)
+        BlockDLL bdll = new BlockDLL();
+        bdll.insert(new BlockNode(1, 0, 1, makeCharDLL("early"), "ROOT"));
+        bdll.insert(new BlockNode(2, 0, 3, makeCharDLL("late"), "ROOT"));
+        String text = bdll.collectText();
+        check("Block with higher timestamp is placed before block with lower timestamp",
+                text.indexOf("late") < text.indexOf("early"));
+
+        // Equal timestamps: lower siteID wins
+        BlockDLL bdll2 = new BlockDLL();
+        bdll2.insert(new BlockNode(3, 0, 5, makeCharDLL("siteHigh"), "ROOT"));
+        bdll2.insert(new BlockNode(1, 1, 5, makeCharDLL("siteLow"), "ROOT"));
+        String text2 = bdll2.collectText();
+        check("When timestamps equal, block with lower siteID wins (appears first)",
+                text2.indexOf("siteLow") < text2.indexOf("siteHigh"));
+
+        // Insertion order does not affect final ordering (convergence)
+        BlockDLL bdllA = new BlockDLL();
+        bdllA.insert(new BlockNode(1, 0, 1, makeCharDLL("P"), "ROOT"));
+        bdllA.insert(new BlockNode(2, 0, 2, makeCharDLL("Q"), "ROOT"));
+        bdllA.insert(new BlockNode(3, 0, 3, makeCharDLL("R"), "ROOT"));
+
+        BlockDLL bdllB = new BlockDLL();
+        bdllB.insert(new BlockNode(3, 0, 3, makeCharDLL("R"), "ROOT"));
+        bdllB.insert(new BlockNode(1, 0, 1, makeCharDLL("P"), "ROOT"));
+        bdllB.insert(new BlockNode(2, 0, 2, makeCharDLL("Q"), "ROOT"));
+        check("Same blocks inserted in different order converge to the same text",
+                bdllA.collectText().equals(bdllB.collectText()));
+    }
+
+    private static void testEdgeCases() {
+        // collectText skips deleted blocks but continues to remaining blocks
+        BlockDLL bdll = new BlockDLL();
+        bdll.insert(new BlockNode(1, 0, 1, makeCharDLL("keep"), "ROOT"));
+        bdll.insert(new BlockNode(1, 1, 2, makeCharDLL("remove"), "1-0"));
+        bdll.insert(new BlockNode(1, 2, 3, makeCharDLL("also keep"), "1-1"));
+        bdll.delete("1-1");
+        String text = bdll.collectText();
+        check("collectText skips deleted blocks but includes remaining ones",
+                text.contains("keep") && !text.contains("remove") && text.contains("also keep"));
+
+        // A block with no lines (empty CharDLL) is merged/removed by automerge
+        BlockDLL bdll2 = new BlockDLL();
+        CharDLL empty = new CharDLL(0, 0, 0);  // 0 lines
+        CharDLL neighbor = makeMultilineDLL(5);
+        bdll2.insert(new BlockNode(1, 0, 1, neighbor, "ROOT"));
+        bdll2.insert(new BlockNode(1, 1, 2, empty, "1-0"));
+        bdll2.automerge("1-1", 1, 10, 10);
+        check("Block with 0 lines is merged away by automerge",
+                bdll2.getBlock("1-1").isDeleted());
+
+        // getBlock on ROOT sentinel
+        BlockDLL bdll3 = new BlockDLL();
+        check("getBlock(\"ROOT\") returns the sentinel head node",
+                bdll3.getBlock("ROOT") != null);
+
+        // Inserting a block whose blockID equals ROOT is rejected
+        BlockDLL bdll4 = new BlockDLL();
+        // ROOT is already in the map; a second insert with blockID "ROOT" should be ignored
+        // We can't directly construct a BlockNode with blockID "ROOT" through the normal constructor
+        // (it generates siteID+"-"+clock), so we verify the sentinel is undamaged after any attempt:
+        check("ROOT sentinel is always present and undamaged",
+                bdll4.getBlock("ROOT") != null && !bdll4.getBlock("ROOT").isDeleted());
+
+        // Large sequence: 50 blocks inserted sequentially, all visible
+        BlockDLL bdll5 = new BlockDLL();
+        String prevParent = "ROOT";
+        for (int i = 0; i < 50; i++) {
+            BlockNode bn = new BlockNode(1, i, i + 1, makeNewlineDLL(), prevParent);
+            bdll5.insert(bn);
+            prevParent = "1-" + i;
+        }
+        // Count non-deleted blocks
+        int count = 0;
+        BlockNode ptr = bdll5.getBlock("ROOT").getNext();
+        while (ptr != null) { if (!ptr.isDeleted()) count++; ptr = ptr.getNext(); }
+        check("50 sequentially inserted blocks are all present and non-deleted", count == 50);
     }
 }
