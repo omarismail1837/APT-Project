@@ -66,7 +66,8 @@ public class BlockDLL implements ICRDT<BlockNode> {
         b.delete();
     }
 
-    public BlockNode splitBlock(int siteID, long clock, long time, String blockID, String charID) {
+    public BlockNode splitBlock(int siteID, long clock, long time, String charID) {
+        String blockID = charBlockMap.get(charID);
         BlockNode original = map.get(blockID);
         if (original == null || original.isDeleted()) return null;
 
@@ -184,7 +185,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (updatedBlock.getContent().getLineCount() <= 10) return;
         String CharID = updatedBlock.getContent().getCharIDAtLine(10);
         if (CharID == null) return;
-        BlockNode newBlock = splitBlock(siteID, clock, time, blockID, CharID);
+        BlockNode newBlock = splitBlock(siteID, clock, time, CharID);
         if (newBlock == null) return;
 
         BlockNode nextBlock = newBlock.getNext();
@@ -261,15 +262,35 @@ public class BlockDLL implements ICRDT<BlockNode> {
         autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
     }
 
-    public CharDLL copyBlockContent(String blockID, int siteID, long clock, long time, String startCharID) {
-        BlockNode block = map.get(blockID);
-        if (block == null || block.isDeleted()) return null;
-        return block.getContent().copy(siteID, clock, time, startCharID);
-    }
-    public void pasteBlockContent(int siteID, long clock, long time, String targetBlockID, String charID, CharDLL copied) {
+    public CharDLL copyBlockContent(int siteID, long clock, long time, String startCharID, String endCharID) {
+        String startBlockID = charBlockMap.get(startCharID);
+        if (startBlockID == null) return null;
+        String endBlockID = endCharID == null ? null : charBlockMap.get(endCharID);
+        if (endCharID != null && endBlockID == null) return null;
+        CharDLL result = new CharDLL(siteID, clock, time);
+        BlockNode currentBlock = map.get(startBlockID);
 
+        while (currentBlock != null) {
+            if (!currentBlock.isDeleted()) {
+                String start = currentBlock.getBlockID().equals(startBlockID) ? startCharID : null;
+                String end = currentBlock.getBlockID().equals(endBlockID) ? endCharID : null;
+
+                CharDLL blockCopy = currentBlock.getContent().copy(siteID, clock, time, start, end);
+                result.mergeInto(blockCopy);
+
+                CharNode c = blockCopy.getHead().getNext();
+                while (c != null) { clock++; c = c.getNext(); }
+            }
+            if (currentBlock.getBlockID().equals(endBlockID)) break;
+            currentBlock = currentBlock.getNext();
+        }
+        return result;
+    }
+    public void pasteBlockContent(int siteID, long clock, long time, String charID, CharDLL copied) {
+        String targetBlockID = charBlockMap.get(charID);
+        if (targetBlockID == null) return;
         CharDLL temp = copied.copy(siteID, clock, time);
-        BlockNode secondHalf = splitBlock(siteID, clock, time, targetBlockID, charID);
+        BlockNode secondHalf = splitBlock(siteID, clock, time, charID);
         BlockNode first = map.get(targetBlockID);
         first.getContent().mergeInto(temp);
         if (secondHalf != null) {
