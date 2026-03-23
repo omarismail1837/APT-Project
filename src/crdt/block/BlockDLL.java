@@ -261,6 +261,22 @@ public class BlockDLL implements ICRDT<BlockNode> {
         charBlockMap.put(newChar.getCharID(), blockID);
         autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
     }
+    public void setIsBold(String charID, boolean isBold) {
+        if (charID == null) return;
+        String blockID = charBlockMap.get(charID);
+        if (blockID == null) return;
+        BlockNode block = map.get(blockID);
+        if (block == null || block.isDeleted()) return;
+        block.getContent().setIsBold(charID, isBold);
+    }
+    public void setIsItalic(String charID, boolean isItalic) {
+        if (charID == null) return;
+        String blockID = charBlockMap.get(charID);
+        if (blockID == null) return;
+        BlockNode block = map.get(blockID);
+        if (block == null || block.isDeleted()) return;
+        block.getContent().setIsItalic(charID, isItalic);
+    }
 
     public CharDLL copyBlockContent(int siteID, long clock, long time, String startCharID, String endCharID) {
         String startBlockID = charBlockMap.get(startCharID);

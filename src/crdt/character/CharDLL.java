@@ -189,4 +189,18 @@ public class CharDLL implements ICRDT<CharNode> {
         }
         return null;
     }
+
+    public void setIsItalic(String charID, boolean isBold) {
+        if (charID == null) return;
+        CharNode character = map.get(charID);
+        if (character == null) return;
+        character.setBold(isBold);
+    }
+
+    public void setIsBold(String charID, boolean isItalic) {
+        if (charID == null) return;
+        CharNode character = map.get(charID);
+        if (character == null) return;
+        character.setItalic(isItalic);
+    }
 }
