@@ -84,7 +84,6 @@ public class CharDLL implements ICRDT<CharNode> {
         return text.toString();
     }
 
-
     //function needed in block operations to split a single block
     public CharDLL splitAt(int siteID, long clock, long time, String charID) {
         CharDLL newDLL = new CharDLL(siteID, clock, time);
@@ -176,6 +175,7 @@ public class CharDLL implements ICRDT<CharNode> {
         return newDLL;
     }
     public CharNode getHead() { return head; }
+    public String getHeadID() { return head.getCharID(); }
     public String getCharIDAtLine(int lineNumber) {
         int count = 0;
         CharNode ptr = head.getNext();
@@ -190,17 +190,17 @@ public class CharDLL implements ICRDT<CharNode> {
         return null;
     }
 
-    public void setIsItalic(String charID, boolean isBold) {
-        if (charID == null) return;
-        CharNode character = map.get(charID);
-        if (character == null) return;
-        character.setBold(isBold);
-    }
-
-    public void setIsBold(String charID, boolean isItalic) {
+    public void setIsItalic(String charID, boolean isItalic) {
         if (charID == null) return;
         CharNode character = map.get(charID);
         if (character == null) return;
         character.setItalic(isItalic);
+    }
+
+    public void setIsBold(String charID, boolean isBold) {
+        if (charID == null) return;
+        CharNode character = map.get(charID);
+        if (character == null) return;
+        character.setBold(isBold);
     }
 }
