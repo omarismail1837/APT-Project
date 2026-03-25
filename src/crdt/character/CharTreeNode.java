@@ -8,7 +8,7 @@ public class CharTreeNode {
     private final int siteID;
     private final long time;
     private final char content;
-    private final String parentID;
+    private String parentID;
 
     // Mutable
     private boolean isDeleted;

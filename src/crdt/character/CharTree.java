@@ -109,7 +109,6 @@ public class CharTree implements ICRDT<CharTreeNode> {
             for (int i = children.size() - 1; i >= 0; i--)
                 stack.push(children.get(i));
         }
-        // ok to return null because autosplit guards against it
         return null;
     }
 
@@ -185,9 +184,9 @@ public class CharTree implements ICRDT<CharTreeNode> {
         CharTreeNode current = root;
         while (!current.getChildren().isEmpty())
             current = current.getChildren().get(current.getChildren().size() - 1);
-        return current == root ? null : current;
+        return current;
     }
 
-    // TODO: Add copy
+    // TODO: copy
 }
 
