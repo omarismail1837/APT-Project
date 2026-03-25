@@ -116,8 +116,8 @@ public class Tests {
         // Same time -> use siteID as tiebreaker
         CharDLL crdt2 = new CharDLL(0,0,0);
         crdt2.insert(new CharNode(1, 0, 1, 'A', crdt2.getHeadID()));
-        crdt2.insert(new CharNode(2, 0, 2, 'P', crdt2.getHeadID()));
-        crdt2.insert(new CharNode(3, 0, 3, 'T', crdt2.getHeadID()));
+        crdt2.insert(new CharNode(2, 0, 1, 'P', crdt2.getHeadID()));
+        crdt2.insert(new CharNode(3, 0, 1, 'T', crdt2.getHeadID()));
         check("Lower siteID wins when timestamps are equal", crdt2.collectText().equals("APT"));
 
         // Ops with same params converge (even if insertion order is different in code)
