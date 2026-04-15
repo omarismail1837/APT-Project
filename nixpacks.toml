@@ -1,0 +1,5 @@
+[build]
+command = "mvn -pl Server -am clean package -DskipTests"
+
+[start]
+command = "java -jar Server/target/*.jar"
