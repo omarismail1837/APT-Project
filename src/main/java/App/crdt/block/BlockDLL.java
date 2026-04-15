@@ -1,8 +1,8 @@
-package crdt.block;
+package App.crdt.block;
 
-import crdt.character.CharDLL;
-import crdt.character.CharNode;
-import crdt.character.ICRDT;
+import App.crdt.character.CharDLL;
+import App.crdt.character.CharNode;
+import App.crdt.character.ICRDT;
 import java.util.HashMap;
 
 public class BlockDLL implements ICRDT<BlockNode> {
@@ -72,7 +72,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (original == null || original.isDeleted()) return null;
 
         // Split the CharDLL at charID
-        crdt.character.CharDLL newContent = original.getContent().splitAt(siteID,clock,time,charID);
+        CharDLL newContent = original.getContent().splitAt(siteID,clock,time,charID);
         BlockNode newBlock = new BlockNode(
                 siteID,
                 clock,

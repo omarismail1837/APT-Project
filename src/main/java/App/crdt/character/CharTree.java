@@ -1,4 +1,4 @@
-package crdt.character;
+package App.crdt.character;
 
 import java.util.HashMap;
 

@@ -1,4 +1,4 @@
-package crdt.character;
+package App.crdt.character;
 
 public interface ICRDT <T>{
     void insert(T node);

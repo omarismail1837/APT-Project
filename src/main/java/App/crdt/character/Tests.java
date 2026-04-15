@@ -1,4 +1,4 @@
-package crdt.character;
+package App.crdt.character;
 
 public class Tests {
     private static int passes = 0;

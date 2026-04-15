@@ -1,4 +1,4 @@
-package crdt.character;
+package App.crdt.character;
 
 public class CharNode {
     private final String charID;

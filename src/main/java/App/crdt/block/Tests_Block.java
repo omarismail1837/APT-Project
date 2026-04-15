@@ -1,7 +1,7 @@
-package crdt.block;
+package App.crdt.block;
 
-import crdt.character.CharDLL;
-import crdt.character.CharNode;
+import App.crdt.character.CharDLL;
+import App.crdt.character.CharNode;
 
 public class Tests_Block {
     private static int passes = 0;

@@ -1,6 +1,6 @@
-package crdt.block;
+package App.crdt.block;
 
-import crdt.character.CharDLL;
+import App.crdt.character.CharDLL;
 
 public class BlockNode {
     private final String blockID;
