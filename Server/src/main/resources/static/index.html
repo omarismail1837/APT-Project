@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Collaborative CRDT Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f9; }
+        #status-bar {
+            background: #fff; padding: 15px; border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;
+        }
+        #editor {
+            width: 100%; height: 200px; padding: 10px; border-radius: 4px;
+            border: 1px solid #ccc; font-family: monospace; font-size: 16px;
+        }
+        #log-container { margin-top: 20px; }
+        .log-entry {
+            padding: 5px; border-bottom: 1px solid #eee; font-size: 14px;
+        }
+        .my-id { color: #007bff; font-weight: bold; }
+        .status-on { color: green; font-weight: bold; }
+        .status-off { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="status-bar">
+    <strong>Your Site ID:</strong> <span id="display-site-id" class="my-id">Generating...</span> |
+    <strong>Status:</strong> <span id="connection-status" class="status-off">Disconnected</span>
+</div>
+
+<textarea id="editor" placeholder="Type here to collaborate..."></textarea>
+
+<div id="log-container">
+    <h3>Live Activity Feed</h3>
+    <div id="updates-list"></div>
+</div>
+
+<script>
+    let stompClient = null;
+
+    // 1. Generate a unique Site ID for this user
+    const mySiteId = "Site-" + Math.random().toString(36).substr(2, 5).toUpperCase();
+    document.getElementById('display-site-id').innerText = mySiteId;
+
+    function connect() {
+        // Using a relative path for Railway compatibility
+        const socket = new SockJS('/ws-connect');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function (frame) {
+            setConnected(true);
+            console.log('Connected: ' + frame);
+
+            // 2. Subscribe to the topic
+            stompClient.subscribe('/topic/updates', function (sdkEvent) {
+                const message = JSON.parse(sdkEvent.body);
+                handleIncomingUpdate(message);
+            });
+        }, function (error) {
+            setConnected(false);
+            console.error('STOMP error: ' + error);
+        });
+    }
+
+    function setConnected(connected) {
+        const status = document.getElementById('connection-status');
+        status.innerText = connected ? "Connected" : "Disconnected";
+        status.className = connected ? "status-on" : "status-off";
+    }
+
+    // 3. Send update whenever the user types
+    document.getElementById('editor').addEventListener('input', function(e) {
+        const text = e.target.value;
+
+        if (stompClient && stompClient.connected) {
+            const payload = {
+                senderId: mySiteId,
+                content: text
+            };
+            stompClient.send("/app/update", {}, JSON.stringify(payload));
+        }
+    });
+
+    // 4. Handle messages coming from the server
+    function handleIncomingUpdate(message) {
+        // Log the activity
+        const list = document.getElementById('updates-list');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        const time = new Date().toLocaleTimeString();
+
+        entry.innerHTML = `[${time}] <strong>${message.senderId}</strong> updated the text.`;
+        list.insertBefore(entry, list.firstChild);
+
+        // 5. Update the editor ONLY if the message is from someone else
+        // This prevents the "2 or 3 times" duplicate update issue
+        if (message.senderId !== mySiteId) {
+            document.getElementById('editor').value = message.content;
+        }
+    }
+
+    // Initialize connection
+    connect();
+</script>
+</body>
+</html>
