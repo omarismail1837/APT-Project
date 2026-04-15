@@ -1,12 +1,14 @@
 # Step 1: Build the project
 FROM maven:3.8.5-openjdk-17 AS build
+WORKDIR /app
 COPY . .
 RUN mvn -pl Server -am clean package -DskipTests
 
 # Step 2: Run the project
-FROM openjdk:17-jdk-slim
+# We switched from openjdk to eclipse-temurin because it's more reliable
+FROM eclipse-temurin:17-jdk-alpine
 WORKDIR /app
-# This is the line that fixes your error by looking in the sub-folder
-COPY --from=build /Server/target/*.jar app.jar
+# Ensure 'Server' is capitalized exactly like your folder name
+COPY --from=build /app/Server/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
