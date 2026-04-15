@@ -1,14 +1,21 @@
 package App.crdt.block;
 
+import App.crdt.action.Action;
 import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
 import App.crdt.character.ICRDT;
-import java.util.HashMap;
+import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
+
+@Service
 public class BlockDLL implements ICRDT<BlockNode> {
     private final BlockNode head; // sentinel
     private final HashMap<String, BlockNode> map;
     private final HashMap<String, String> charBlockMap;
+    private List<Action> allActions;
 
     public BlockDLL() {
         head = new BlockNode();
@@ -311,6 +318,19 @@ public class BlockDLL implements ICRDT<BlockNode> {
             secondHalf.delete();
         }
         autosplit(siteID, clock + 1, time, targetBlockID);
+    }
+
+    //Action Functions
+
+    public synchronized void applyAction(Action update) {
+        if (allActions.contains(update)) return; //already applied
+        allActions.add(update);
+    }
+
+    public List<Action> getAllActions() {
+
+
+        return new ArrayList<>();
     }
 
 }

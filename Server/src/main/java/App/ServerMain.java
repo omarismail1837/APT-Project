@@ -14,4 +14,10 @@ public class ServerMain {
         SpringApplication.run(ServerMain.class, args);
     }
 
+    //create blockdll (should be from database later)
+    BlockDLL document = new BlockDLL();
+
+
+
+
 }
