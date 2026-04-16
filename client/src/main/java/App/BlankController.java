@@ -2,7 +2,7 @@ package App;
 
 import App.crdt.block.BlockDLL;
 import App.crdt.block.BlockNode;
-import App.crdt.character.CharNode;
+import App.crdt.character.CharDLL;import App.crdt.character.CharNode;
 import App.crdt.action.Action;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
@@ -23,6 +23,9 @@ public class BlankController implements Initializable {
     // any doc starts as one block
     // expands into multiple blocks as text gets added via splitting
     private BlockDLL blockDLL = new BlockDLL();
+    CharDLL content0 = new CharDLL(mySiteID, ++clock, System.currentTimeMillis());
+    BlockNode block0 = new BlockNode(mySiteID, ++clock, System.currentTimeMillis(), content0, "ROOT");
+
 
     // map UI indices to actual CharNodes
     private ArrayList<CharNode> visibleNodes = new ArrayList<>();
@@ -36,6 +39,7 @@ public class BlankController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        blockDLL.insert(block0);
         setUpTextAreaListener();
     }
 
@@ -56,7 +60,9 @@ public class BlankController implements Initializable {
         // INSERT
         if (!text.isEmpty()) {
             // Find the ID of the node to the left of the cursor
-            String pID = (idx == 0) ? "ROOT" : visibleNodes.get(idx - 1).getCharID();
+            String pID;
+            String rootID = block0.getContent().getHeadID();
+            pID = (idx == 0) ? rootID : visibleNodes.get(idx - 1).getCharID();
 
             int thisClock = ++clock;
             CharNode newNode = new CharNode(mySiteID, thisClock, System.currentTimeMillis(), text.charAt(0), pID);
