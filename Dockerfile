@@ -9,6 +9,6 @@ RUN mvn -pl Server -am clean package -DskipTests
 FROM eclipse-temurin:17-jdk-alpine
 WORKDIR /app
 # Ensure 'Server' is capitalized exactly like your folder name
-COPY --from=build /app/Server/target/*.jar app.jar
+COPY --from=build /app/server/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
