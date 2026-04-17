@@ -251,16 +251,16 @@ public class BlockDLL implements ICRDT<BlockNode> {
         autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
     }
 
-    //can be deleted
-//    public void deleteChar(String charID, int siteID, long clock, long time) {
-//        String blockID = charBlockMap.get(charID);
-//        if (blockID == null) return;
-//
-//        BlockNode block = map.get(blockID);
-//        if (block == null) return;
-//        block.getContent().delete(charID);
-//        automerge(blockID, siteID, clock, time);
-//    }
+    //can be deleted?
+    public void deleteChar(String charID, int siteID, long clock, long time) {
+        String blockID = charBlockMap.get(charID);
+        if (blockID == null) return;
+
+        BlockNode block = map.get(blockID);
+        if (block == null) return;
+        block.getContent().delete(charID);
+        automerge(blockID, siteID, clock, time);
+    }
 
     public void deleteChars(String startCharID, String endCharID, int siteID, long clock, long time) {
         String startBlockID = charBlockMap.get(startCharID);
