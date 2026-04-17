@@ -71,7 +71,7 @@ public class BlankController implements Initializable {
             blockDLL.insertChar(pID, newNode);
 
             // create the action object
-            Action action = new Action(thisClock, mySiteID, docID, "INSERT", pID, null, text);
+            Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "INSERT", pID, null, text);
 
             // TODO: Send the action to the network
 
@@ -87,7 +87,7 @@ public class BlankController implements Initializable {
             blockDLL.deleteChar(targetID, mySiteID, thisClock, System.currentTimeMillis());
 
             // create the action object
-            Action action = new Action(thisClock, mySiteID, docID, "DELETE", targetID, null, null);
+            Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "DELETE", targetID, null, null);
 
             // TODO: Send the action to the network
 
@@ -112,7 +112,7 @@ public class BlankController implements Initializable {
                 // dive into the character level of this block
                 CharNode charPtr = blockPtr.getContent().getHead().getNext();
                 while (charPtr != null) {
-                    if (!charPtr.isDeleted()) {
+                    if (!charPtr.getIsDeleted()) {
                         visibleNodes.add(charPtr);
                     }
                     charPtr = charPtr.getNext();
