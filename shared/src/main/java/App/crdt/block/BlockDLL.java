@@ -148,21 +148,22 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
     }
 
-    public CharDLL copyBlock(String BlockID, int SiteID, long clock,long time) {
-        BlockNode original = map.get(BlockID);
-        if (original == null || original.isDeleted()) return null;
-        return original.copyContent(SiteID,clock,time);
-    }
-
-    public void pasteBlock(CharDLL pasted, String blockID, int SiteID, long clock, long time) {
-        if (pasted == null) return;
-        BlockNode target = map.get(blockID);
-        if (target == null || target.isDeleted()) return;
-        CharDLL copied = pasted.copy(SiteID, clock + 1, time);
-        if (copied == null) return;
-        BlockNode newBlock = new BlockNode(SiteID, clock, time, copied, target.getBlockID());
-        insert(newBlock);
-    }
+    //can be deleted
+//    public CharDLL copyBlock(String BlockID, int SiteID, long clock,long time) {
+//        BlockNode original = map.get(BlockID);
+//        if (original == null || original.isDeleted()) return null;
+//        return original.copyContent(SiteID,clock,time);
+//    }
+//
+//    public void pasteBlock(CharDLL pasted, String blockID, int SiteID, long clock, long time) {
+//        if (pasted == null) return;
+//        BlockNode target = map.get(blockID);
+//        if (target == null || target.isDeleted()) return;
+//        CharDLL copied = pasted.copy(SiteID, clock + 1, time);
+//        if (copied == null) return;
+//        BlockNode newBlock = new BlockNode(SiteID, clock, time, copied, target.getBlockID());
+//        insert(newBlock);
+//    }
 
     @Override
     public String collectText() {
@@ -249,6 +250,8 @@ public class BlockDLL implements ICRDT<BlockNode> {
         charBlockMap.put(newChar.getCharID(), blockID);
         autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
     }
+
+    //can be deleted?
     public void deleteChar(String charID, int siteID, long clock, long time) {
         String blockID = charBlockMap.get(charID);
         if (blockID == null) return;
@@ -258,34 +261,67 @@ public class BlockDLL implements ICRDT<BlockNode> {
         block.getContent().delete(charID);
         automerge(blockID, siteID, clock, time);
     }
-    public void replaceChar(String oldCharID, CharNode newChar,int siteID, long clock, long time) {
-        String blockID = charBlockMap.get(oldCharID);
-        deleteChar(oldCharID, siteID, clock, time);
-        if (blockID == null) return;
-        BlockNode block = map.get(blockID);
-        if (block == null || block.isDeleted()) return;
-        block.getContent().insert(newChar);
-        charBlockMap.put(newChar.getCharID(), blockID);
-        autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
-    }
-    public void setIsBold(String charID, boolean isBold) {
-        if (charID == null) return;
-        String blockID = charBlockMap.get(charID);
-        if (blockID == null) return;
-        BlockNode block = map.get(blockID);
-        if (block == null || block.isDeleted()) return;
-        block.getContent().setIsBold(charID, isBold);
-    }
-    public void setIsItalic(String charID, boolean isItalic) {
-        if (charID == null) return;
-        String blockID = charBlockMap.get(charID);
-        if (blockID == null) return;
-        BlockNode block = map.get(blockID);
-        if (block == null || block.isDeleted()) return;
-        block.getContent().setIsItalic(charID, isItalic);
+
+    public void deleteChars(String startCharID, String endCharID, int siteID, long clock, long time) {
+        String startBlockID = charBlockMap.get(startCharID);
+        String endBlockID = charBlockMap.get(endCharID);
+        if (startBlockID == null || endBlockID == null) return;
+
+        BlockNode startBlockNode = map.get(startBlockID);
+        BlockNode endBlockNode = map.get(endBlockID);
+        if (startBlockNode == null || endBlockNode == null) return;
+
+        BlockNode currentBlock = startBlockNode;
+        String currentCharID = startCharID;
+
+        while (currentBlock != null) {
+            String startchar = (currentBlock == startBlockNode) ? startCharID : null;
+            String endchar = (currentBlock == endBlockNode) ? endCharID : null;
+            currentBlock.getContent().deleteRange(startchar, endchar);
+            if (currentBlock == endBlockNode) break;
+            currentBlock = currentBlock.getNext();
+        }
+
+        currentBlock = startBlockNode;
+        while (currentBlock != null) {
+            automerge(currentBlock.getBlockID(), siteID, clock, time);
+            if (currentBlock.getBlockID() == endBlockID) break;
+            currentBlock = currentBlock.getNext();
+        }
+
     }
 
-    public CharDLL copyBlockContent(int siteID, long clock, long time, String startCharID, String endCharID) {
+   //can be deleted
+//    public void replaceChar(String oldCharID, CharNode newChar,int siteID, long clock, long time) {
+//        String blockID = charBlockMap.get(oldCharID);
+//        deleteChar(oldCharID, siteID, clock, time);
+//        if (blockID == null) return;
+//        BlockNode block = map.get(blockID);
+//        if (block == null || block.isDeleted()) return;
+//        block.getContent().insert(newChar);
+//        charBlockMap.put(newChar.getCharID(), blockID);
+//        autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
+//    }
+
+  //can be deleted
+//    public void setIsBold(String charID, boolean isBold) {
+//        if (charID == null) return;
+//        String blockID = charBlockMap.get(charID);
+//        if (blockID == null) return;
+//        BlockNode block = map.get(blockID);
+//        if (block == null || block.isDeleted()) return;
+//        block.getContent().setIsBold(charID, isBold);
+//    }
+//    public void setIsItalic(String charID, boolean isItalic) {
+//        if (charID == null) return;
+//        String blockID = charBlockMap.get(charID);
+//        if (blockID == null) return;
+//        BlockNode block = map.get(blockID);
+//        if (block == null || block.isDeleted()) return;
+//        block.getContent().setIsItalic(charID, isItalic);
+//    }
+
+    public String copyBlockContent(int siteID, long clock, long time, String startCharID, String endCharID) {
         String startBlockID = charBlockMap.get(startCharID);
         if (startBlockID == null) return null;
         String endBlockID = endCharID == null ? null : charBlockMap.get(endCharID);
@@ -304,9 +340,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
             if (currentBlock.getBlockID().equals(endBlockID)) break;
             currentBlock = currentBlock.getNext();
         }
-        return result;
+        return result.convertListToJson();
     }
-    public void pasteBlockContent(int siteID, long clock, long time, String charID, CharDLL copied) {
+    public void pasteBlockContent(int siteID, long clock, long time, String charID, String copiedJSON) {
+
+        CharDLL copied = CharDLL.convertJSONToCharDLL(copiedJSON, siteID, clock, time);
         String targetBlockID = charBlockMap.get(charID);
         if (targetBlockID == null) return;
         CharDLL temp = copied.copy(siteID, clock, time);
@@ -325,12 +363,88 @@ public class BlockDLL implements ICRDT<BlockNode> {
     public synchronized void applyAction(Action update) {
         if (allActions.contains(update)) return; //already applied
         allActions.add(update);
+
+        String startCharID = update.getStartCharID();
+        String endCharID = update.getEndCharID();
+        String extraData = update.getExtraData();
+        long clock = update.getClock();
+        int siteID = update.getSiteID();
+        long time = update.getTime();
+
+        //apply action
+        switch(update.getActionType()) {
+            case "DELETE":
+                deleteChars(startCharID,endCharID, siteID, clock, time);
+                break;
+
+            case "INSERT":
+                insertChar(startCharID, new CharNode(siteID, clock, time, extraData.charAt(0), startCharID));
+                break;
+
+            case "PASTE":
+                pasteBlockContent(siteID, clock, time, startCharID, extraData);
+                break;
+
+            case "BOLD":
+                setIsBoldRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
+                break;
+
+            case "ITALIC":
+                setIsItalicRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
+                break;
+
+        }
+
+    }
+
+    private void setIsItalicRange(String startCharID, String endCharID, boolean b) {
+
+        String startBlockID = charBlockMap.get(startCharID);
+        String endBlockID = charBlockMap.get(endCharID);
+        if (startBlockID == null || endBlockID == null) return;
+
+        BlockNode startBlockNode = map.get(startBlockID);
+        BlockNode endBlockNode = map.get(endBlockID);
+        if (startBlockNode == null || endBlockNode == null) return;
+
+        BlockNode currentBlock = startBlockNode;
+        String currentCharID = startCharID;
+
+        while (currentBlock != null) {
+            String startchar = (currentBlock == startBlockNode) ? startCharID : null;
+            String endchar = (currentBlock == endBlockNode) ? endCharID : null;
+            currentBlock.getContent().italicRange(startchar, endchar, b);
+            if (currentBlock == endBlockNode) break;
+            currentBlock = currentBlock.getNext();
+        }
+
+    }
+
+    private void setIsBoldRange(String startCharID, String endCharID, boolean b) {
+
+        String startBlockID = charBlockMap.get(startCharID);
+        String endBlockID = charBlockMap.get(endCharID);
+        if (startBlockID == null || endBlockID == null) return;
+
+        BlockNode startBlockNode = map.get(startBlockID);
+        BlockNode endBlockNode = map.get(endBlockID);
+        if (startBlockNode == null || endBlockNode == null) return;
+
+        BlockNode currentBlock = startBlockNode;
+        String currentCharID = startCharID;
+
+        while (currentBlock != null) {
+            String startchar = (currentBlock == startBlockNode) ? startCharID : null;
+            String endchar = (currentBlock == endBlockNode) ? endCharID : null;
+            currentBlock.getContent().boldRange(startchar, endchar, b);
+            if (currentBlock == endBlockNode) break;
+            currentBlock = currentBlock.getNext();
+        }
+
     }
 
     public List<Action> getAllActions() {
-
-
-        return new ArrayList<>();
+        return new ArrayList<>(allActions);
     }
 
 }

@@ -3,6 +3,7 @@ package App.crdt.action;
 public class Action {
 
     long clock; //used to identify unique actions along with siteID
+    long time;
     int siteID;
     String documentID;
     String actionType;
@@ -10,18 +11,20 @@ public class Action {
     String endCharID;
     String extraData;
 
-    public Action(long clock, int SiteID, String documentID, String actionType, String startCharID, String endCharID, String extraData) {
+    public Action(long clock, long time, int SiteID, String documentID, String actionType, String startCharID, String endCharID, String extraData) {
         this.clock = clock;
         this.siteID = SiteID;
+        this.time = time;
         this.documentID = documentID;
         this.actionType = actionType;
         this.startCharID = startCharID;
         this.endCharID = endCharID;
-        this.extraData = extraData;
+        this.extraData = extraData; //holds JSON if pasting, character if inserting, true/false if italic/bold
     }
     public Action() {} //required for JSON
     //getters
     public long getClock() {return clock;}
+    public long getTime() {return time;}
     public int getSiteID() {return siteID;}
     public String getDocumentID() {return documentID;}
     public String getActionType() {return actionType;}
@@ -31,6 +34,7 @@ public class Action {
 
     //setters
     public void setClock(long clock) {this.clock = clock;}
+    public void setTime(long time) {this.time = time;}
     public void setSiteID(int siteID) {this.siteID = siteID;}
     public void setDocumentID(String documentID) {this.documentID = documentID;}
     public void setActionType(String actionType) {this.actionType = actionType;}

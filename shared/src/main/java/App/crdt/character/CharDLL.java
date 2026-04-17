@@ -1,10 +1,15 @@
 package App.crdt.character;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class CharDLL implements ICRDT<CharNode> {
     private final CharNode head; // sentinel
-    private HashMap<String, CharNode> map;
+    private final HashMap<String, CharNode> map;
     private int lineCount;
 
     public CharDLL(int siteID, long clock, long time)
@@ -65,10 +70,21 @@ public class CharDLL implements ICRDT<CharNode> {
     public void delete(String id) {
         CharNode c = map.get(id);
         if (c == null) return;
-        if (!c.isDeleted() && c.getContent() == '\n') lineCount--;
+        if (!c.getIsDeleted() && c.getContent() == '\n') lineCount--;
         //decrement line count if new line wasnt already deleted... important if 2 users delete line at same time
         c.delete();
         // Will not remove from hashmap bec future inserts may still reference it as a parent
+    }
+
+    public void deleteRange(String startID, String endID) {
+        CharNode ptr = map.get(startID);
+
+        while (ptr != null) {
+            delete(ptr.getCharID());
+            if (endID != null && ptr.getCharID().equals(endID)) break;
+            ptr = ptr.getNext();
+        }
+
     }
 
     @Override
@@ -78,11 +94,12 @@ public class CharDLL implements ICRDT<CharNode> {
         CharNode vPtr = head.getNext();
         while(vPtr != null)
         {
-            if (!vPtr.isDeleted()) text.append(vPtr.getContent());
+            if (!vPtr.getIsDeleted()) text.append(vPtr.getContent());
             vPtr = vPtr.getNext();
         }
         return text.toString();
     }
+
 
     //function needed in block operations to split a single block
     public CharDLL splitAt(int siteID, long clock, long time, String charID) {
@@ -91,7 +108,7 @@ public class CharDLL implements ICRDT<CharNode> {
         if (ptr == null) return newDLL;
         String prevID = newDLL.head.getCharID();
         while (ptr != null) {
-            if (!ptr.isDeleted()) {
+            if (!ptr.getIsDeleted()) {
                 CharNode newNode = new CharNode(
                         ptr.getSiteID(),
                         ptr.getClock(),
@@ -126,7 +143,7 @@ public class CharDLL implements ICRDT<CharNode> {
         map.put(sentinelCopy.getCharID(), sentinelCopy);
         CharNode otherPtr = other.head.getNext();
         while (otherPtr != null) {
-            if (!otherPtr.isDeleted()) {
+            if (!otherPtr.getIsDeleted()) {
                 CharNode newNode = new CharNode(
                         otherPtr.getSiteID(),
                         otherPtr.getClock(),
@@ -164,7 +181,7 @@ public class CharDLL implements ICRDT<CharNode> {
         if (ptr == null) return newDLL;
         String prevID = newDLL.head.getCharID();
         while (ptr != null) {
-            if (!ptr.isDeleted()) {
+            if (!ptr.getIsDeleted()) {
                 CharNode newNode = new CharNode(siteID, ++clockRef[0], ptr.getTime(), ptr.getContent(), prevID, ptr.getBold(), ptr.getItalic());
                 newDLL.insert(newNode);
                 prevID = siteID + "-" + clockRef[0];
@@ -180,7 +197,7 @@ public class CharDLL implements ICRDT<CharNode> {
         int count = 0;
         CharNode ptr = head.getNext();
         while (ptr != null) {
-            if (!ptr.isDeleted() && ptr.getContent() == '\n') {
+            if (!ptr.getIsDeleted() && ptr.getContent() == '\n') {
                 count++;
                 if (count == lineNumber && ptr.getNext() != null)
                     return ptr.getNext().getCharID();
@@ -202,5 +219,68 @@ public class CharDLL implements ICRDT<CharNode> {
         CharNode character = map.get(charID);
         if (character == null) return;
         character.setBold(isBold);
+    }
+
+    public String convertListToJson() {
+        List<CharNode> nodes = new ArrayList<>();
+        CharNode ptr = head.getNext();
+        while (ptr != null) {nodes.add(ptr); ptr = ptr.getNext();}
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            // takes list, respects @JsonIgnore, and creates a String
+            return mapper.writeValueAsString(nodes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static CharDLL convertJSONToCharDLL(String json, int siteID, long clock, long time) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+
+            // 1. Convert JSON string back into a temporary List of nodes
+            List<CharNode> tempNodes = mapper.readValue(json, new TypeReference<List<CharNode>>(){});
+
+            // 2. Create the wrapper object
+            CharDLL newDLL = new CharDLL(siteID, clock, time);
+
+            // 3. Stitch the pointers back together
+            if (tempNodes != null && !tempNodes.isEmpty()) {
+                tempNodes.get(0).setParentID(newDLL.getHeadID()); // change first node parent to root
+                for (CharNode current : tempNodes) {
+                    newDLL.insert(current);
+                }
+            }
+
+            return newDLL;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public void boldRange(String startchar, String endchar, Boolean isBold) {
+
+        CharNode ptr = (startchar == null)? head.getNext() : map.get(startchar);
+
+        while (ptr != null) {
+            ptr.setBold(isBold);
+            if (endchar != null && ptr.getCharID().equals(endchar)) break;
+            ptr = ptr.getNext();
+        }
+    }
+
+    public void italicRange(String startchar, String endchar, boolean isItalic) {
+
+        CharNode ptr = (startchar == null)? head.getNext() : map.get(startchar);
+
+        while (ptr != null) {
+            ptr.setItalic(isItalic);
+            if (endchar != null && ptr.getCharID().equals(endchar)) break;
+            ptr = ptr.getNext();
+        }
+
     }
 }

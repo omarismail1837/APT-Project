@@ -25,7 +25,7 @@ public class BlankController implements Initializable {
     private BlockDLL blockDLL = new BlockDLL();
     CharDLL content0 = new CharDLL(mySiteID, ++clock, System.currentTimeMillis());
     BlockNode block0 = new BlockNode(mySiteID, ++clock, System.currentTimeMillis(), content0, "ROOT");
-    private WebSocketService wsService;
+
 
     // map UI indices to actual CharNodes
     private ArrayList<CharNode> visibleNodes = new ArrayList<>();
@@ -41,11 +41,6 @@ public class BlankController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         blockDLL.insert(block0);
         setUpTextAreaListener();
-
-        wsService = new WebSocketService(action -> {
-            javafx.application.Platform.runLater(() -> handleRemoteAction(action));
-        });
-        wsService.connect("http://localhost:8080/ws-connect");
     }
 
     private void setUpTextAreaListener() {
@@ -62,31 +57,44 @@ public class BlankController implements Initializable {
         String text = change.getText();
         int idx = change.getRangeStart();
 
-        if (change.getRangeStart() < change.getRangeEnd()) {
-            if (idx < visibleNodes.size()) {
-                String targetID = visibleNodes.get(idx).getCharID();
-                int thisClock = ++clock;
-                blockDLL.deleteChar(targetID, mySiteID, thisClock, System.currentTimeMillis());
-                Action action = new Action(thisClock, mySiteID, docID, "DELETE", targetID, null, null);
-                new Thread(() -> wsService.sendAction(action)).start();
-                refreshMapping();
-            }
-        }
-
         // INSERT
         if (!text.isEmpty()) {
+            // Find the ID of the node to the left of the cursor
             String pID;
             String rootID = block0.getContent().getHeadID();
-            pID = (idx == 0) ? rootID : (idx <= visibleNodes.size() ? visibleNodes.get(idx - 1).getCharID() : rootID);
+            pID = (idx == 0) ? rootID : visibleNodes.get(idx - 1).getCharID();
 
             int thisClock = ++clock;
             CharNode newNode = new CharNode(mySiteID, thisClock, System.currentTimeMillis(), text.charAt(0), pID);
+
+            // blockDLL handles the insertion logic via charBlockMap
             blockDLL.insertChar(pID, newNode);
-            Action action = new Action(thisClock, mySiteID, docID, "INSERT", pID, null, text);
-            new Thread(() -> wsService.sendAction(action)).start();
+
+            // create the action object
+            Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "INSERT", pID, null, text);
+
+            // TODO: Send the action to the network
+
             refreshMapping();
         }
 
+        // DELETE
+        if (change.getRangeStart() < change.getRangeEnd()) {
+            // The ID of the character currently sitting at this index
+            String targetID = visibleNodes.get(idx).getCharID();
+
+            int thisClock = ++clock;
+            blockDLL.deleteChar(targetID, mySiteID, thisClock, System.currentTimeMillis());
+
+            // create the action object
+            Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "DELETE", targetID, null, null);
+
+            // TODO: Send the action to the network
+
+            refreshMapping();
+        }
+
+        // verify dll is correct with console
         System.out.println("Full Document:\n" + blockDLL.collectText());
     }
 
@@ -104,7 +112,7 @@ public class BlankController implements Initializable {
                 // dive into the character level of this block
                 CharNode charPtr = blockPtr.getContent().getHead().getNext();
                 while (charPtr != null) {
-                    if (!charPtr.isDeleted()) {
+                    if (!charPtr.getIsDeleted()) {
                         visibleNodes.add(charPtr);
                     }
                     charPtr = charPtr.getNext();
@@ -116,7 +124,6 @@ public class BlankController implements Initializable {
 
     // TODO: Receive messages from server
     public void handleRemoteAction(Action incomingAction) {
-        if (incomingAction.getSiteID() == mySiteID) return;
         isRemoteUpdate = true;
 
         // Apply logic
