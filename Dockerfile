@@ -2,7 +2,7 @@
 FROM maven:3.8.5-openjdk-17 AS build
 WORKDIR /app
 COPY . .
-RUN mvn -pl server -am clean package -DskipTests
+RUN mvn -pl server -am clean package -DskipTests -X
 
 # Step 2: Run the project
 # We switched from openjdk to eclipse-temurin because it's more reliable
