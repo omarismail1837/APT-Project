@@ -19,7 +19,7 @@ public class Action {
         this.endCharID = endCharID;
         this.extraData = extraData;
     }
-
+    public Action() {} //required for JSON
     //getters
     public long getClock() {return clock;}
     public int getSiteID() {return siteID;}
