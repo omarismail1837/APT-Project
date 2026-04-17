@@ -16,9 +16,8 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>shared</module>
-        <module>server</module>
-        <module>client</module>
+        <module>Server</module>
+        <module>Client</module>
     </modules>
 
     <properties>
@@ -67,12 +66,6 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-websocket</artifactId>
             <version>6.1.1</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-websocket</artifactId>
-            <version>6.1.6</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
