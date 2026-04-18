@@ -72,11 +72,37 @@ public class BlankController implements Initializable {
             public TextFormatter.Change apply(TextFormatter.Change change) {
                 if (!isRemoteUpdate && change.isContentChange()) {
                     processChange(change);
+                    int preferredCaret = change.getRangeStart();
+                    if (change.getText() != null && !change.getText().isEmpty()) {
+                        preferredCaret += change.getText().length();
+                    }
+                    rerenderFromBlockDLLAfterLocalChange(preferredCaret);
+                    // Model already updated; cancel direct TextArea mutation and keep UI model-driven.
+                    return null;
                 }
                 return change;
             }
         }));
     }
+
+    private void rerenderFromBlockDLLAfterLocalChange(int preferredCaret) {
+        boolean previousRemoteFlag = isRemoteUpdate;
+        isRemoteUpdate = true;
+        try {
+            double scrollTop = textArea != null ? textArea.getScrollTop() : 0;
+            double scrollLeft = textArea != null ? textArea.getScrollLeft() : 0;
+            refreshMapping();
+            textArea.setText(blockDLL.collectText());
+            int max = textArea.getLength();
+            int safeCaret = Math.max(0, Math.min(preferredCaret, max));
+            textArea.selectRange(safeCaret, safeCaret);
+            textArea.setScrollTop(scrollTop);
+            textArea.setScrollLeft(scrollLeft);
+        } finally {
+            isRemoteUpdate = previousRemoteFlag;
+        }
+    }
+
 
     private void processChange(TextFormatter.Change change) {
         String text = change.getText();

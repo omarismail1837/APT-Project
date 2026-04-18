@@ -180,9 +180,15 @@ public class BlockDLL implements ICRDT<BlockNode> {
     public String collectText() {
         StringBuilder text = new StringBuilder();
         BlockNode ptr = head.getNext();
+        boolean wroteAnyBlock = false;
         while (ptr != null) {
-            if (!ptr.isDeleted())
-                text.append(ptr.getContent().collectText()).append("\n");
+            if (!ptr.isDeleted()) {
+                if (wroteAnyBlock) {
+                    text.append("\n");
+                }
+                text.append(ptr.getContent().collectText());
+                wroteAnyBlock = true;
+            }
             ptr = ptr.getNext();
         }
         return text.toString();

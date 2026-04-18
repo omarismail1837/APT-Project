@@ -85,7 +85,7 @@ public class Tests_Block {
         CharDLL content = makeCharDLL("hello");
         BlockNode b = new BlockNode(1, 0, 1, content, "ROOT");
         bdll2.insert(b);
-        check("Single block inserted produces its text", bdll2.collectText().equals("hello\n"));
+        check("Single block inserted produces its text", bdll2.collectText().equals("hello"));
 
         BlockDLL bdll3 = new BlockDLL();
         bdll3.insert(new BlockNode(1, 0, 1, makeCharDLL("first"), "ROOT"));
@@ -97,7 +97,7 @@ public class Tests_Block {
         BlockNode dup = new BlockNode(1, 0, 1, makeCharDLL("dup"), "ROOT");
         bdll4.insert(dup);
         bdll4.insert(dup);
-        check("Duplicate block insert is silently ignored", bdll4.collectText().equals("dup\n"));
+        check("Duplicate block insert is silently ignored", bdll4.collectText().equals("dup"));
 
         BlockDLL bdll5 = new BlockDLL();
         bdll5.insert(new BlockNode(1, 0, 1, makeCharDLL("orphan"), "nonexistent-parent"));
