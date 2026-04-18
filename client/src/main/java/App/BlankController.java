@@ -107,3 +107,5 @@ public class BlankController implements Initializable {
         blockDLL.applyAction(incomingAction);
         textArea.setText(blockDLL.collectText());
         refreshMapping();
+    }
+}
