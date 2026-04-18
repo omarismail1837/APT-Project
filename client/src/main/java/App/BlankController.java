@@ -47,7 +47,7 @@ public class BlankController implements Initializable {
                 });
             }
         });
-        String wsUrl = System.getProperty("ws.url", "http://localhost:8080/ws-connect");
+        String wsUrl = System.getProperty("ws.url", "https://apt-project-production-326d.up.railway.app/ws-connect");
         wsService.connect(wsUrl);
     }
 
