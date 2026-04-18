@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 @Service
 public class BlockDLL implements ICRDT<BlockNode> {
@@ -16,6 +18,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
     private final HashMap<String, BlockNode> map;
     private final HashMap<String, String> charBlockMap;
     private List<Action> allActions;
+    private Set<String> appliedActionIds;
 
     public BlockDLL() {
         head = new BlockNode();
@@ -24,18 +27,25 @@ public class BlockDLL implements ICRDT<BlockNode> {
         charBlockMap = new HashMap<>();
         map.put("ROOT", head);
         allActions = new ArrayList<>();
+        appliedActionIds = new HashSet<>();
+
+        // Shared deterministic bootstrap so all replicas have the same initial parent IDs.
+        ensureSeedHeadID();
     }
     public String getBlockIDByCharID(String charID) {
         return charBlockMap.get(charID);
     }
     @Override
     public void insert(BlockNode b) {
+        if (b == null || b.getContent() == null) return;
         BlockNode parent = map.get(b.getParentID());
 
         if (parent == null) return;
         if (map.containsKey(b.getBlockID())) return;
 
         map.put(b.getBlockID(), b);
+        // Map CharDLL sentinel head as a valid insertion anchor for this block.
+        charBlockMap.put(b.getContent().getHeadID(), b.getBlockID());
         CharNode ptr = b.getContent().getHead().getNext();
         while (ptr != null) {
             charBlockMap.put(ptr.getCharID(), b.getBlockID());
@@ -241,25 +251,45 @@ public class BlockDLL implements ICRDT<BlockNode> {
             autosplit(siteID, clock, time,  previousBlock.getBlockID());}
     }
     public void insertChar(String parentCharID, CharNode newChar) {
+        System.out.println("[BlockDLL.insertChar] parent=" + parentCharID + " newChar=" + (newChar == null ? "null" : newChar.getCharID()));
         String blockID = charBlockMap.get(parentCharID);
-        if (blockID == null) return;
+        if (blockID == null) {
+            System.out.println("[BlockDLL.insertChar] SKIP parent not in charBlockMap");
+            return;
+        }
 
         BlockNode block = map.get(blockID);
-        if (block == null || block.isDeleted()) return;
+        if (block == null) {
+            System.out.println("[BlockDLL.insertChar] SKIP block not in map blockID=" + blockID);
+            return;
+        }
+        if (block.isDeleted()) {
+            System.out.println("[BlockDLL.insertChar] SKIP block deleted blockID=" + blockID);
+            return;
+        }
 
         block.getContent().insert(newChar);
         charBlockMap.put(newChar.getCharID(), blockID);
+        System.out.println("[BlockDLL.insertChar] OK blockID=" + blockID);
         autosplit(newChar.getSiteID(), newChar.getClock() + 1, newChar.getTime(), blockID);
     }
 
     //can be deleted?
     public void deleteChar(String charID, int siteID, long clock, long time) {
+        System.out.println("[BlockDLL.deleteChar] charID=" + charID);
         String blockID = charBlockMap.get(charID);
-        if (blockID == null) return;
+        if (blockID == null) {
+            System.out.println("[BlockDLL.deleteChar] SKIP char not in charBlockMap");
+            return;
+        }
 
         BlockNode block = map.get(blockID);
-        if (block == null) return;
+        if (block == null) {
+            System.out.println("[BlockDLL.deleteChar] SKIP block not in map blockID=" + blockID);
+            return;
+        }
         block.getContent().delete(charID);
+        System.out.println("[BlockDLL.deleteChar] OK blockID=" + blockID);
         automerge(blockID, siteID, clock, time);
     }
 
@@ -365,11 +395,50 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (allActions == null) {
             allActions = new ArrayList<>();
         }
+        if (appliedActionIds == null) {
+            appliedActionIds = new HashSet<>();
+            for (Action action : allActions) {
+                if (action != null) {
+                    appliedActionIds.add(buildActionId(action));
+                }
+            }
+        }
+    }
+
+    public synchronized String ensureSeedHeadID() {
+        BlockNode root = map.get("ROOT");
+        if (root == null) {
+            return null;
+        }
+
+        BlockNode first = root.getNext();
+        if (first != null && first.getContent() != null) {
+            String headID = first.getContent().getHeadID();
+            charBlockMap.put(headID, first.getBlockID());
+            return headID;
+        }
+
+        CharDLL seedContent = new CharDLL(0, 1, 0L);
+        BlockNode seedBlock = new BlockNode(0, 2, 0L, seedContent, "ROOT");
+        insert(seedBlock);
+
+        BlockNode created = root.getNext();
+        if (created == null || created.getContent() == null) {
+            return null;
+        }
+        String headID = created.getContent().getHeadID();
+        charBlockMap.put(headID, created.getBlockID());
+        return headID;
     }
 
     public synchronized void applyAction(Action update) {
+        if (update == null) return;
         ensureActionsListInitialized();
-        if (allActions.contains(update)) return; //already applied
+        String actionId = buildActionId(update);
+        if (appliedActionIds.contains(actionId)) {
+            return;
+        }
+        appliedActionIds.add(actionId);
         allActions.add(update);
 
         String startCharID = update.getStartCharID();
@@ -382,11 +451,17 @@ public class BlockDLL implements ICRDT<BlockNode> {
         //apply action
         switch(update.getActionType()) {
             case "DELETE":
-                deleteChars(startCharID,endCharID, siteID, clock, time);
+                if (endCharID == null || endCharID.isBlank()) {
+                    deleteChar(startCharID, siteID, clock, time);
+                } else {
+                    deleteChars(startCharID, endCharID, siteID, clock, time);
+                }
                 break;
 
             case "INSERT":
-                insertChar(startCharID, new CharNode(siteID, clock, time, extraData.charAt(0), startCharID));
+                if (extraData != null && !extraData.isEmpty()) {
+                    insertChar(startCharID, new CharNode(siteID, clock, time, extraData.charAt(0), startCharID));
+                }
                 break;
 
             case "PASTE":
@@ -399,6 +474,9 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
             case "ITALIC":
                 setIsItalicRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
+                break;
+
+            default:
                 break;
 
         }
@@ -454,6 +532,13 @@ public class BlockDLL implements ICRDT<BlockNode> {
     public List<Action> getAllActions() {
         ensureActionsListInitialized();
         return new ArrayList<>(allActions);
+    }
+
+    private String buildActionId(Action action) {
+        if (action == null) {
+            return "null";
+        }
+        return action.getDocumentID() + ":" + action.getSiteID() + ":" + action.getClock();
     }
 
 }

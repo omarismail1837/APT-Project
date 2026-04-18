@@ -1,5 +1,7 @@
 package App.crdt.action;
 
+import java.util.Objects;
+
 public class Action {
 
     long clock; //used to identify unique actions along with siteID
@@ -41,6 +43,35 @@ public class Action {
     public void setStartCharID(String startCharID) {this.startCharID = startCharID;}
     public void setEndCharID(String endCharID) {this.endCharID = endCharID;}
     public void setExtraData(String extraData) {this.extraData = extraData;}
+
+    public String getActionId() {
+        return documentID + ":" + siteID + ":" + clock;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (!(obj instanceof Action other)) return false;
+        return clock == other.clock
+                && siteID == other.siteID
+                && Objects.equals(documentID, other.documentID);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(clock, siteID, documentID);
+    }
+
+    @Override
+    public String toString() {
+        return "Action{" +
+                "id='" + getActionId() + '\'' +
+                ", type='" + actionType + '\'' +
+                ", start='" + startCharID + '\'' +
+                ", end='" + endCharID + '\'' +
+                ", extra='" + extraData + '\'' +
+                '}';
+    }
 
 
 }

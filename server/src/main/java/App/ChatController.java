@@ -22,17 +22,21 @@ public class ChatController {
     @MessageMapping("/send-data")
     @SendTo("/topic/updates")
     public Action sendUpdate(Action update) {
-        // Apply to server-side CRDT to keep the master copy updated
-        System.out.println("Received update: " + update);
+        if (update == null) {
+            return null;
+        }
+        if (update.getDocumentID() == null || update.getDocumentID().isBlank()) {
+            return null;
+        }
+
         document.applyAction(update);
-        // myCrdtEngine.apply(update);
         return update;
     }
 
     @SubscribeMapping("/initial-state")
     public List<Action> sendInitialState() {
-        System.out.println("New user joined. Sending full document state...");
-        // Return the full list of actions
-        return document.getAllActions();
+        List<Action> snapshot = document.getAllActions();
+        System.out.println("[SERVER] Initial-state size=" + snapshot.size());
+        return snapshot;
     }
 }
