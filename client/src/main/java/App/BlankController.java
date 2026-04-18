@@ -13,12 +13,13 @@ import javafx.scene.control.TextFormatter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 public class BlankController implements Initializable {
 
-    private final int mySiteID = 1;
+    private final int mySiteID = Math.abs(UUID.randomUUID().hashCode());
     private int clock = 0;
     private final String docID = "doc-123";
     private WebSocketService wsService;
@@ -35,15 +36,18 @@ public class BlankController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        System.out.println("[CLIENT INIT] mySiteID=" + mySiteID + " docID=" + docID);
         blockDLL.insert(block0);
         setUpTextAreaListener();
 
         wsService = new WebSocketService(new Consumer<Action>() {
             @Override
             public void accept(final Action action) {
+                System.out.println("[CLIENT CALLBACK] received action from websocket=" + action);
                 javafx.application.Platform.runLater(new Runnable() {
                     @Override
                     public void run() {
+                        System.out.println("[CLIENT CALLBACK FX] applying action on JavaFX thread=" + action);
                         handleRemoteAction(action);
                     }
                 });
@@ -125,10 +129,21 @@ public class BlankController implements Initializable {
     }
 
     public void handleRemoteAction(Action incomingAction) {
-        if (incomingAction.getSiteID() == mySiteID) return;
+        System.out.println("[REMOTE HANDLE] incomingSiteID=" + incomingAction.getSiteID() + " mySiteID=" + mySiteID + " action=" + incomingAction);
+        if (incomingAction.getSiteID() == mySiteID) {
+            System.out.println("[REMOTE HANDLE] skipped because incoming action has same siteID as this client.");
+            return;
+        }
         isRemoteUpdate = true;
-        blockDLL.applyAction(incomingAction);
-        textArea.setText(blockDLL.collectText());
-        refreshMapping();
+        try {
+            System.out.println("[REMOTE HANDLE] applying action...");
+            blockDLL.applyAction(incomingAction);
+            textArea.setText(blockDLL.collectText());
+            refreshMapping();
+            System.out.println("[REMOTE HANDLE] applied. textLength=" + textArea.getText().length());
+        } finally {
+            isRemoteUpdate = false;
+            System.out.println("[REMOTE HANDLE] done. isRemoteUpdate reset to false");
+        }
     }
 }

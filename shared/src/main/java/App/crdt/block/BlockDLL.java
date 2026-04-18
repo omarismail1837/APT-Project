@@ -361,7 +361,14 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
     //Action Functions
 
+    private void ensureActionsListInitialized() {
+        if (allActions == null) {
+            allActions = new ArrayList<>();
+        }
+    }
+
     public synchronized void applyAction(Action update) {
+        ensureActionsListInitialized();
         if (allActions.contains(update)) return; //already applied
         allActions.add(update);
 
@@ -445,6 +452,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
     }
 
     public List<Action> getAllActions() {
+        ensureActionsListInitialized();
         return new ArrayList<>(allActions);
     }
 
