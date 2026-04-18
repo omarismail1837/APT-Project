@@ -1,10 +1,10 @@
 package App;
 
+import App.crdt.action.Action;
 import App.crdt.block.BlockDLL;
 import App.crdt.block.BlockNode;
 import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
-import App.crdt.action.Action;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.TextArea;
