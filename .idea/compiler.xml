@@ -8,11 +8,11 @@
         <outputRelativeToContentRoot value="true" />
         <module name="client" />
         <module name="server" />
+        <module name="shared" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
       <module name="APT Project" target="17" />
-      <module name="shared" target="17" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">

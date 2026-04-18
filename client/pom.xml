@@ -17,9 +17,6 @@
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>shared</artifactId>
-            <version>1.0-SNAPSHOT</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/../Shared/target/shared-1.0-SNAPSHOT.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
@@ -46,6 +43,8 @@
             <artifactId>Java-WebSocket</artifactId>
             <version>1.5.3</version>
         </dependency>
+
+
 
     </dependencies>
 
