@@ -13,6 +13,8 @@ import javafx.scene.control.TextFormatter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 public class BlankController implements Initializable {
 
@@ -25,7 +27,7 @@ public class BlankController implements Initializable {
     CharDLL content0 = new CharDLL(mySiteID, ++clock, System.currentTimeMillis());
     BlockNode block0 = new BlockNode(mySiteID, ++clock, System.currentTimeMillis(), content0, "ROOT");
 
-    private ArrayList<CharNode> visibleNodes = new ArrayList<>();
+    private ArrayList<CharNode> visibleNodes = new ArrayList<CharNode>();
     private boolean isRemoteUpdate = false;
 
     @FXML
@@ -36,18 +38,29 @@ public class BlankController implements Initializable {
         blockDLL.insert(block0);
         setUpTextAreaListener();
 
-        wsService = new WebSocketService(action -> {
-            javafx.application.Platform.runLater(() -> handleRemoteAction(action));
+        wsService = new WebSocketService(new Consumer<Action>() {
+            @Override
+            public void accept(final Action action) {
+                javafx.application.Platform.runLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        handleRemoteAction(action);
+                    }
+                });
+            }
         });
         wsService.connect("http://localhost:8080/ws-connect");
     }
 
     private void setUpTextAreaListener() {
-        textArea.setTextFormatter(new TextFormatter<>(change -> {
-            if (!isRemoteUpdate && change.isContentChange()) {
-                processChange(change);
+        textArea.setTextFormatter(new TextFormatter<TextFormatter.Change>(new UnaryOperator<TextFormatter.Change>() {
+            @Override
+            public TextFormatter.Change apply(TextFormatter.Change change) {
+                if (!isRemoteUpdate && change.isContentChange()) {
+                    processChange(change);
+                }
+                return change;
             }
-            return change;
         }));
     }
 
@@ -61,8 +74,13 @@ public class BlankController implements Initializable {
                 String targetID = visibleNodes.get(idx).getCharID();
                 int thisClock = ++clock;
                 blockDLL.deleteChar(targetID, mySiteID, thisClock, System.currentTimeMillis());
-                Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "DELETE", targetID, null, null);
-                new Thread(() -> wsService.sendAction(action)).start();
+                final Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "DELETE", targetID, null, null);
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        wsService.sendAction(action);
+                    }
+                }).start();
                 refreshMapping();
             }
         }
@@ -76,8 +94,13 @@ public class BlankController implements Initializable {
             int thisClock = ++clock;
             CharNode newNode = new CharNode(mySiteID, thisClock, System.currentTimeMillis(), text.charAt(0), pID);
             blockDLL.insertChar(pID, newNode);
-            Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "INSERT", pID, null, text);
-            new Thread(() -> wsService.sendAction(action)).start();
+            final Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "INSERT", pID, null, text);
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    wsService.sendAction(action);
+                }
+            }).start();
             refreshMapping();
         }
 
