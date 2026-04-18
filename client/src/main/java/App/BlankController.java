@@ -110,7 +110,7 @@ public class BlankController implements Initializable {
                 return;
             }
 
-            String parentID = (idx == 0) ? rootID : (idx <= visibleNodes.size() ? visibleNodes.get(idx - 1).getCharID() : rootID);
+            String parentID = resolveParentIDForInsert(idx, rootID);
 
             for (int i = 0; i < text.length(); i++) {
                 char nextChar = text.charAt(i);
@@ -127,6 +127,20 @@ public class BlankController implements Initializable {
             }
             refreshMapping();
         }
+    }
+
+    private String resolveParentIDForInsert(int textAreaIndex, String rootID) {
+        if (visibleNodes.isEmpty()) {
+            return rootID;
+        }
+
+        // TextArea indices can be larger than visible CRDT chars because block rendering adds line breaks.
+        int normalizedIndex = Math.max(0, Math.min(textAreaIndex, visibleNodes.size()));
+        if (normalizedIndex == 0) {
+            return rootID;
+        }
+
+        return visibleNodes.get(normalizedIndex - 1).getCharID();
     }
 
     private String getSeedHeadID() {
