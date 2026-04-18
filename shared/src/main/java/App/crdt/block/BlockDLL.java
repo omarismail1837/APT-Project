@@ -12,10 +12,15 @@ import java.util.ArrayList;
 
 @Service
 public class BlockDLL implements ICRDT<BlockNode> {
+    private static final int SYSTEM_SITE_ID = 0;
+    private static final long INITIAL_CLOCK = 1L;
+    private static final long INITIAL_TIME = 0L;
+
     private final BlockNode head; // sentinel
     private final HashMap<String, BlockNode> map;
     private final HashMap<String, String> charBlockMap;
     private List<Action> allActions;
+    private final List<Action> pendingActions;
 
     public BlockDLL() {
         head = new BlockNode();
@@ -23,7 +28,14 @@ public class BlockDLL implements ICRDT<BlockNode> {
         map = new HashMap<>();
         charBlockMap = new HashMap<>();
         map.put("ROOT", head);
+
+        // Ensure all replicas start from the same deterministic first block and head char ID.
+        CharDLL initialContent = new CharDLL(SYSTEM_SITE_ID, INITIAL_CLOCK, INITIAL_TIME);
+        BlockNode initialBlock = new BlockNode(SYSTEM_SITE_ID, INITIAL_CLOCK, INITIAL_TIME, initialContent, "ROOT");
+        insert(initialBlock);
+
         allActions = new ArrayList<>();
+        pendingActions = new ArrayList<>();
     }
     public String getBlockIDByCharID(String charID) {
         return charBlockMap.get(charID);
@@ -36,6 +48,8 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (map.containsKey(b.getBlockID())) return;
 
         map.put(b.getBlockID(), b);
+        // Allow inserts that target the block's head sentinel as parent.
+        charBlockMap.put(b.getContent().getHeadID(), b.getBlockID());
         CharNode ptr = b.getContent().getHead().getNext();
         while (ptr != null) {
             charBlockMap.put(ptr.getCharID(), b.getBlockID());
@@ -362,8 +376,37 @@ public class BlockDLL implements ICRDT<BlockNode> {
     //Action Functions
 
     public synchronized void applyAction(Action update) {
+        if (update == null) return;
         if (allActions.contains(update)) return; //already applied
+
+        if (!tryApplyAction(update)) {
+            if (!pendingActions.contains(update)) {
+                pendingActions.add(update);
+            }
+            return;
+        }
+
         allActions.add(update);
+        drainPendingActions();
+    }
+
+    private void drainPendingActions() {
+        boolean progressed;
+        do {
+            progressed = false;
+            for (int i = 0; i < pendingActions.size(); i++) {
+                Action pending = pendingActions.get(i);
+                if (tryApplyAction(pending)) {
+                    allActions.add(pending);
+                    pendingActions.remove(i);
+                    progressed = true;
+                    break;
+                }
+            }
+        } while (progressed);
+    }
+
+    private boolean tryApplyAction(Action update) {
 
         String startCharID = update.getStartCharID();
         String endCharID = update.getEndCharID();
@@ -376,25 +419,39 @@ public class BlockDLL implements ICRDT<BlockNode> {
         switch(update.getActionType()) {
             case "DELETE":
                 deleteChars(startCharID,endCharID, siteID, clock, time);
-                break;
+                return true;
 
             case "INSERT":
-                insertChar(startCharID, new CharNode(siteID, clock, time, extraData.charAt(0), startCharID));
-                break;
+                boolean insertedAll = true;
+                if (extraData != null) {
+                    String parentID = startCharID;
+                    for (int i = 0; i < extraData.length(); i++) {
+                        CharNode newChar = new CharNode(siteID, clock + i, time, extraData.charAt(i), parentID);
+                        insertChar(parentID, newChar);
+                        if (!charBlockMap.containsKey(newChar.getCharID())) {
+                            insertedAll = false;
+                            break;
+                        }
+                        parentID = newChar.getCharID();
+                    }
+                }
+                return insertedAll;
 
             case "PASTE":
                 pasteBlockContent(siteID, clock, time, startCharID, extraData);
-                break;
+                return true;
 
             case "BOLD":
                 setIsBoldRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
-                break;
+                return true;
 
             case "ITALIC":
                 setIsItalicRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
-                break;
+                return true;
 
         }
+
+        return false;
 
     }
 

@@ -13,19 +13,18 @@ import javafx.scene.control.TextFormatter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 public class BlankController implements Initializable {
 
-    private final int mySiteID = 1;
+    private final int mySiteID = ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE);
     private int clock = 0;
     private final String docID = "doc-123";
     private WebSocketService wsService;
 
     private BlockDLL blockDLL = new BlockDLL();
-    CharDLL content0 = new CharDLL(mySiteID, ++clock, System.currentTimeMillis());
-    BlockNode block0 = new BlockNode(mySiteID, ++clock, System.currentTimeMillis(), content0, "ROOT");
 
     private ArrayList<CharNode> visibleNodes = new ArrayList<CharNode>();
     private boolean isRemoteUpdate = false;
@@ -35,7 +34,6 @@ public class BlankController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        blockDLL.insert(block0);
         setUpTextAreaListener();
 
         wsService = new WebSocketService(new Consumer<Action>() {
@@ -49,7 +47,8 @@ public class BlankController implements Initializable {
                 });
             }
         });
-        wsService.connect("https://apt-project-production-326d.up.railway.app/ws-connect");
+        String wsUrl = System.getProperty("ws.url", "http://localhost:8080/ws-connect");
+        wsService.connect(wsUrl);
     }
 
     private void setUpTextAreaListener() {
@@ -87,32 +86,63 @@ public class BlankController implements Initializable {
 
         // INSERT
         if (!text.isEmpty()) {
-            String pID;
-            String rootID = block0.getContent().getHeadID();
-            pID = (idx == 0) ? rootID : (idx <= visibleNodes.size() ? visibleNodes.get(idx - 1).getCharID() : rootID);
+            String rootID = getRootCharID();
+            if (rootID == null) {
+                return;
+            }
+            String pID = (idx == 0) ? rootID : (idx <= visibleNodes.size() ? visibleNodes.get(idx - 1).getCharID() : rootID);
 
-            int thisClock = ++clock;
-            CharNode newNode = new CharNode(mySiteID, thisClock, System.currentTimeMillis(), text.charAt(0), pID);
-            blockDLL.insertChar(pID, newNode);
-            final Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "INSERT", pID, null, text);
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    wsService.sendAction(action);
-                }
-            }).start();
+            for (int i = 0; i < text.length(); i++) {
+                int thisClock = ++clock;
+                CharNode newNode = new CharNode(mySiteID, thisClock, System.currentTimeMillis(), text.charAt(i), pID);
+                blockDLL.insertChar(pID, newNode);
+
+                final Action action = new Action(thisClock, System.currentTimeMillis(), mySiteID, docID, "INSERT", pID, null, String.valueOf(text.charAt(i)));
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        wsService.sendAction(action);
+                    }
+                }).start();
+
+                pID = newNode.getCharID();
+            }
             refreshMapping();
         }
 
         System.out.println("Full Document:\n" + blockDLL.collectText());
     }
 
+    private String getRootCharID() {
+        BlockNode root = blockDLL.getBlock("ROOT");
+        if (root == null) {
+            return null;
+        }
+
+        BlockNode firstBlock = root.getNext();
+        if (firstBlock == null || firstBlock.getContent() == null) {
+            return null;
+        }
+        return firstBlock.getContent().getHeadID();
+    }
+
     private void refreshMapping() {
         visibleNodes.clear();
-        BlockNode blockPtr = blockDLL.getBlock("ROOT").getNext();
+        BlockNode root = blockDLL.getBlock("ROOT");
+        if (root == null) {
+            return;
+        }
+
+        BlockNode blockPtr = root.getNext();
         while (blockPtr != null) {
             if (!blockPtr.isDeleted()) {
-                CharNode charPtr = blockPtr.getContent().getHead().getNext();
+                CharDLL content = blockPtr.getContent();
+                if (content == null || content.getHead() == null) {
+                    blockPtr = blockPtr.getNext();
+                    continue;
+                }
+
+                CharNode charPtr = content.getHead().getNext();
                 while (charPtr != null) {
                     if (!charPtr.getIsDeleted()) {
                         visibleNodes.add(charPtr);
@@ -125,10 +155,22 @@ public class BlankController implements Initializable {
     }
 
     public void handleRemoteAction(Action incomingAction) {
-        if (incomingAction.getSiteID() == mySiteID) return;
+        if (incomingAction == null) {
+            return;
+        }
+        if (incomingAction.getSiteID() == mySiteID) {
+            return;
+        }
+
         isRemoteUpdate = true;
-        blockDLL.applyAction(incomingAction);
-        textArea.setText(blockDLL.collectText());
-        refreshMapping();
+        try {
+            blockDLL.applyAction(incomingAction);
+            if (textArea != null) {
+                textArea.setText(blockDLL.collectText());
+            }
+            refreshMapping();
+        } finally {
+            isRemoteUpdate = false;
+        }
     }
 }

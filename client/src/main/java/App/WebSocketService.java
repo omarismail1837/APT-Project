@@ -1,6 +1,7 @@
 package App;
 
 import App.crdt.action.Action;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.simp.stomp.*;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
@@ -10,12 +11,14 @@ import org.springframework.web.socket.sockjs.client.WebSocketTransport;
 
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public class WebSocketService {
 
     private StompSession session;
     private final Consumer<Action> onActionReceived;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public WebSocketService(Consumer<Action> onActionReceived) {
         this.onActionReceived = onActionReceived;
@@ -44,7 +47,9 @@ public class WebSocketService {
 
                     @Override
                     public void handleFrame(StompHeaders headers, Object payload) {
-                        onActionReceived.accept((Action) payload);
+                        if (payload instanceof Action) {
+                            onActionReceived.accept((Action) payload);
+                        }
                     }
                 });
 
@@ -55,12 +60,17 @@ public class WebSocketService {
                     }
 
                     @Override
-                    @SuppressWarnings("unchecked")
                     public void handleFrame(StompHeaders headers, Object payload) {
-                        List<?> rawList = (List<?>) payload;
-                        for (Object item : rawList) {
+                        if (!(payload instanceof List<?> payloadList)) {
+                            return;
+                        }
+
+                        for (Object item : payloadList) {
                             if (item instanceof Action) {
                                 onActionReceived.accept((Action) item);
+                            } else if (item instanceof Map<?, ?>) {
+                                Action mapped = objectMapper.convertValue(item, Action.class);
+                                onActionReceived.accept(mapped);
                             }
                         }
                     }
