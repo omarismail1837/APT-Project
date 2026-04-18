@@ -23,6 +23,7 @@ public class ChatController {
     @SendTo("/topic/updates")
     public Action sendUpdate(Action update) {
         // Apply to server-side CRDT to keep the master copy updated
+        System.out.println("Received update: " + update);
         document.applyAction(update);
         // myCrdtEngine.apply(update);
         return update;

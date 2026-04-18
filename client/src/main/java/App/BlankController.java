@@ -49,7 +49,7 @@ public class BlankController implements Initializable {
                 });
             }
         });
-        wsService.connect("http://localhost:8080/ws-connect");
+        wsService.connect("https://apt-project-production-326d.up.railway.app/ws-connect");
     }
 
     private void setUpTextAreaListener() {

@@ -51,12 +51,18 @@ public class WebSocketService {
                 session.subscribe("/app/initial-state", new StompFrameHandler() {
                     @Override
                     public Type getPayloadType(StompHeaders headers) {
-                        return Action.class;
+                        return List.class;
                     }
 
                     @Override
+                    @SuppressWarnings("unchecked")
                     public void handleFrame(StompHeaders headers, Object payload) {
-                        onActionReceived.accept((Action) payload);
+                        List<?> rawList = (List<?>) payload;
+                        for (Object item : rawList) {
+                            if (item instanceof Action) {
+                                onActionReceived.accept((Action) item);
+                            }
+                        }
                     }
                 });
             }

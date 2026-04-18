@@ -23,6 +23,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         map = new HashMap<>();
         charBlockMap = new HashMap<>();
         map.put("ROOT", head);
+        allActions = new ArrayList<>();
     }
     public String getBlockIDByCharID(String charID) {
         return charBlockMap.get(charID);
