@@ -5,14 +5,15 @@ WORKDIR /app
 # Copy the entire project into the container
 COPY . .
 
-# Run Maven using the lowercase module name
-RUN mvn -pl :server -am clean package -DskipTests
+# We force the platform to 'linux' so Maven doesn't look for 'win' files
+RUN mvn -pl :server -am clean package -DskipTests -Djavafx.platform=linux
 
 # Step 2: Run the project
 FROM eclipse-temurin:17-jdk-alpine
 WORKDIR /app
 
-# Copy the JAR using the Capitalized folder name 'Server'
+# IMPORTANT: Ensure the folder name matches your actual folder (server vs Server)
+# If your folder is lowercase 'server', use this:
 COPY --from=build /app/Server/target/server-1.0-SNAPSHOT.jar app.jar
 
 EXPOSE 8080
