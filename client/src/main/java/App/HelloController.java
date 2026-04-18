@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 public class HelloController {
     private final BlockDLL blockDLL;
 
+    // recv the document from HelloApplication's controller factory
     public HelloController(BlockDLL blockDLL) {
         this.blockDLL = blockDLL;
     }
@@ -25,6 +26,7 @@ public class HelloController {
     private Button newDocButton;
 
     @FXML
+    // doesnt open new window; replaces the current scene with a new one loaded from new-doc.fxml
     private void newDoc() throws IOException {
         Stage stage = (Stage) newDocButton.getScene().getWindow();
         URL fxmlUrl = resolveFxml("/App/new-doc.fxml");
@@ -39,6 +41,7 @@ public class HelloController {
         stage.show();
     }
 
+    // same thing as in HelloApplication but for new-doc.fxml instead of hello-view.fxml
     private URL resolveFxml(String classpathLocation) throws IOException {
         URL fromClasspath = HelloApplication.class.getResource(classpathLocation);
         if (fromClasspath != null) {
