@@ -1,31 +1,27 @@
 package App;
 
 import App.crdt.action.Action;
-import App.crdt.block.BlockDLL;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.stereotype.Controller;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Controller
 public class ChatController {
 
     // @Autowired
-    private final BlockDLL document;
+    private final List<Action> allActions;
 
-    public ChatController(BlockDLL document) {
-        this.document = document;
-    }
+    public ChatController() {allActions = new ArrayList<>();}
 
     @MessageMapping("/send-data")
     @SendTo("/topic/updates")
     public Action sendUpdate(Action update) {
-        // Apply to server-side CRDT to keep the master copy updated
         System.out.println("Received update: " + update);
-        document.applyAction(update);
-        // myCrdtEngine.apply(update);
+        if (!allActions.contains(update)) allActions.add(update);
         return update;
     }
 
@@ -33,6 +29,6 @@ public class ChatController {
     public List<Action> sendInitialState() {
         System.out.println("New user joined. Sending full document state...");
         // Return the full list of actions
-        return document.getAllActions();
+        return new ArrayList<>(allActions);
     }
 }
