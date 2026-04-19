@@ -55,8 +55,15 @@ public class BlockNode {
     public void setParentID(String parentID) { this.parentID = parentID; }
 
     public boolean winsOver(BlockNode other) throws RuntimeException {
-        if (this.time != other.time)
+        if (this.time != other.time) {
             return this.time > other.time;
-        return this.siteID < other.siteID;
+        }
+        if (this.clock != other.clock) {
+            return this.clock > other.clock;
+        }
+        if (this.siteID != other.siteID) {
+            return this.siteID < other.siteID;
+        }
+        return this.blockID.compareTo(other.blockID) < 0;
     }
 }

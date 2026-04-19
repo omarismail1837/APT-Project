@@ -62,8 +62,15 @@ public class CharTreeNode {
 
     public boolean winsOver(CharTreeNode other)
     {
-        if (this.time != other.time)
+        if (this.time != other.time) {
             return this.time > other.time;
-        return this.siteID < other.siteID;
+        }
+        if (this.clock != other.clock) {
+            return this.clock > other.clock;
+        }
+        if (this.siteID != other.siteID) {
+            return this.siteID < other.siteID;
+        }
+        return this.charID.compareTo(other.charID) < 0;
     }
 }

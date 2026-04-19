@@ -180,14 +180,9 @@ public class BlockDLL implements ICRDT<BlockNode> {
     public String collectText() {
         StringBuilder text = new StringBuilder();
         BlockNode ptr = head.getNext();
-        boolean wroteAnyBlock = false;
         while (ptr != null) {
             if (!ptr.isDeleted()) {
-                if (wroteAnyBlock) {
-                    text.append("\n");
-                }
                 text.append(ptr.getContent().collectText());
-                wroteAnyBlock = true;
             }
             ptr = ptr.getNext();
         }
@@ -201,27 +196,50 @@ public class BlockDLL implements ICRDT<BlockNode> {
     //auto merge and split
     //if line count > 10 then split block - should be checked when inserting and pasting
     public void autosplit(int siteID, long clock, long time, String blockID) {
-        //split lines after 10th and merge to the one after
-        //if it cant fit in block after then split block after and merge....
-        BlockNode updatedBlock = map.get(blockID);
+        BlockNode oldBlock = map.get(blockID);
+        if (oldBlock == null || oldBlock.getContent() == null) return;
 
-        if (updatedBlock == null) return;
+        // 1. Find the 11th line start
+        String splitCharID = findSplitPoint(oldBlock.getContent(), 10);
+        if (splitCharID == null) return;
 
-        if (updatedBlock.getContent().getLineCount() <= 10) return;
-        String CharID = updatedBlock.getContent().getCharIDAtLine(10);
-        if (CharID == null) return;
-        BlockNode newBlock = splitBlock(siteID, clock, time, CharID);
-        if (newBlock == null) return;
+        // 2. Perform the split
+        // We use a high offset for the split clock or pass the current controller clock
+        // to ensure the new block ID is unique and doesn't "clash" with typed chars.
+        CharDLL movedContent = oldBlock.getContent().splitAt(siteID, ++clock, time, splitCharID);
 
-        BlockNode nextBlock = newBlock.getNext();
+        if (movedContent != null) {
+            // 3. Create the new block
+            BlockNode newBlock = new BlockNode(siteID, ++clock, time, movedContent, oldBlock.getBlockID());
 
-        while (nextBlock != null && nextBlock.isDeleted())
-            nextBlock = nextBlock.getNext();
-        if (nextBlock == null) return;
+            // 4. Update the character-to-block mapping BEFORE inserting
+            // This is the most critical step for the cursor stability
+            for (String cid : movedContent.getAllCharIDs()) {
+                charBlockMap.put(cid, newBlock.getBlockID());
+            }
 
-        mergeBlocks(newBlock.getBlockID(), nextBlock.getBlockID());
-        autosplit(siteID, clock + 1, time, newBlock.getBlockID());
+            // 5. Insert the new block into the Block CRDT
+            this.insert(newBlock);
+        }
+    }
 
+    private String findSplitPoint(CharDLL content, int lineThreshold) {
+        // Start after the ROOT sentinel node
+        CharNode ptr = content.getHead().getNext();
+        int newlineCount = 0;
+
+        while (ptr != null) {
+            if (ptr.getContent() == '\n') {
+                newlineCount++;
+            }
+            // If we hit the 10th newline, the next node is the split point
+            if (newlineCount == lineThreshold) {
+                CharNode nextNode = ptr.getNext();
+                return (nextNode != null) ? nextNode.getCharID() : null;
+            }
+            ptr = ptr.getNext();
+        }
+        return null;
     }
 
     //if line count < 2 then merge block with block before or after - should be checked when deleting
@@ -466,7 +484,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
             case "INSERT":
                 if (extraData != null && !extraData.isEmpty()) {
-                    insertChar(startCharID, new CharNode(siteID, clock, time, extraData.charAt(0), startCharID));
+                    char inserted = extraData.charAt(0);
+                    if (inserted == '\r') {
+                        inserted = '\n';
+                    }
+                    insertChar(startCharID, new CharNode(siteID, clock, time, inserted, startCharID));
                 }
                 break;
 
@@ -547,4 +569,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         return action.getDocumentID() + ":" + action.getSiteID() + ":" + action.getClock();
     }
 
+    public BlockNode getHead() {
+        return head;
+    }
 }

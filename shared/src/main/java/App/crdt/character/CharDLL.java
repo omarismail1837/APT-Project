@@ -3,9 +3,7 @@ package App.crdt.character;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class CharDLL implements ICRDT<CharNode> {
     private final CharNode head; // sentinel
@@ -101,61 +99,104 @@ public class CharDLL implements ICRDT<CharNode> {
     }
 
 
-    //function needed in block operations to split a single block
+    // function needed in block operations to split a single block
     public CharDLL splitAt(int siteID, long clock, long time, String charID) {
-        CharDLL newDLL = new CharDLL(siteID, clock, time);
+        // Use a reserved sentinel site ID so split heads never collide with real character IDs.
+        CharDLL newDLL = new CharDLL(-1, clock, time);
         CharNode ptr = map.get(charID);
         if (ptr == null) return newDLL;
-        String prevID = newDLL.head.getCharID();
+
+        CharNode leftTail = ptr.getPrev();
+        if (leftTail != null) {
+            leftTail.setNext(null);
+        }
+
+        String prevID = newDLL.getHeadID();
+        // In CharDLL.java - Modified splitAt snippet
         while (ptr != null) {
-            if (!ptr.getIsDeleted()) {
-                CharNode newNode = new CharNode(
-                        ptr.getSiteID(),
-                        ptr.getClock(),
-                        ptr.getTime(),
-                        ptr.getContent(),
-                        prevID,
-                        ptr.getBold(),
-                        ptr.getItalic()
-                );
-                newDLL.insert(newNode);
-                prevID = ptr.getSiteID() + "-" + ptr.getClock();
-            }
-            this.delete(ptr.getCharID());
-            ptr = ptr.getNext();
+            CharNode next = ptr.getNext();
+
+            // Instead of creating a 'movedNode' with a new ID:
+            // 1. Remove from current map
+            map.remove(ptr.getCharID());
+
+            // 2. Clear pointers
+            ptr.setPrev(null);
+            ptr.setNext(null);
+
+            // 3. Insert the EXACT same instance into the new DLL
+            newDLL.insertExistingNode(ptr); // You'll need a method that doesn't generate new IDs
+
+            ptr = next;
         }
         return newDLL;
     }
 
-   //function needed in block operations to merge two blocks
-    public void mergeInto(CharDLL other) {
-        //get last node from current chardll
-        CharNode lastNode = head.getNext();
+    private void insertExistingNode(CharNode node) {
+        if (node == null) return;
 
-        while (lastNode != null) {
-            if (lastNode.getNext() == null) break;
-            lastNode = lastNode.getNext();
+        // 1. Ensure we aren't duplicating
+        if (map.containsKey(node.getCharID())) return;
+
+        // 2. Find the parent within THIS specific DLL
+        CharNode parent = map.get(node.getParentID());
+        if (parent == null) {
+            // Fallback: If parent isn't found, attach to head to prevent data loss
+            node.setParentID(head.getCharID());
+            parent = head;
         }
 
-        String prevID = (lastNode == null? head.getCharID(): lastNode.getCharID());
-        CharNode sentinelCopy = new CharNode(other.head.getSiteID(), other.head.getClock(), other.head.getTime(), other.head.getContent(), other.head.getParentID());
-        sentinelCopy.delete();
-        map.put(sentinelCopy.getCharID(), sentinelCopy);
+        // 3. Register in map and update metadata
+        map.put(node.getCharID(), node);
+        if (node.getContent() == '\n') lineCount++;
+        node.setDepth(parent.getDepth() + 1);
+
+        // 4. Standard CRDT link logic (Handling potential concurrent inserts)
+        CharNode rightNeighbour = parent.getNext();
+        while (rightNeighbour != null && rightNeighbour.winsOver(node)) {
+            parent = rightNeighbour;
+            rightNeighbour = parent.getNext();
+        }
+
+        // 5. Stitch pointers
+        node.setNext(rightNeighbour);
+        node.setPrev(parent);
+        parent.setNext(node);
+        if (rightNeighbour != null) {
+            rightNeighbour.setPrev(node);
+        }
+    }
+
+    //function needed in block operations to merge two blocks
+    public void mergeInto(CharDLL other) {
+        if (other == null) return;
+
+        CharNode tail = head;
+        while (tail.getNext() != null) {
+            tail = tail.getNext();
+        }
+
+        String prevID = tail.getCharID();
         CharNode otherPtr = other.head.getNext();
         while (otherPtr != null) {
-            if (!otherPtr.getIsDeleted()) {
-                CharNode newNode = new CharNode(
-                        otherPtr.getSiteID(),
-                        otherPtr.getClock(),
-                        otherPtr.getTime(),
-                        otherPtr.getContent(),
-                        prevID,
-                        otherPtr.getBold(),
-                        otherPtr.getItalic()
-                );
+            CharNode newNode = new CharNode(
+                    otherPtr.getSiteID(),
+                    otherPtr.getClock(),
+                    otherPtr.getTime(),
+                    otherPtr.getContent(),
+                    prevID,
+                    otherPtr.getBold(),
+                    otherPtr.getItalic()
+            );
+
+            if (!map.containsKey(newNode.getCharID())) {
                 this.insert(newNode);
-                prevID = otherPtr.getSiteID() + "-" + otherPtr.getClock();
+                if (otherPtr.getIsDeleted()) {
+                    this.delete(newNode.getCharID());
+                }
+                prevID = newNode.getCharID();
             }
+
             otherPtr = otherPtr.getNext();
         }
     }
@@ -283,4 +324,16 @@ public class CharDLL implements ICRDT<CharNode> {
         }
 
     }
+
+    public String[] getAllCharIDs() {
+        // 1. Copy the keys so we don't modify the actual map
+        Set<String> allKeys = new HashSet<>(map.keySet());
+
+        // 2. Remove the sentinel ID
+        allKeys.remove(head.getCharID()); // or "ROOT"
+
+        // 3. Return as array
+        return allKeys.toArray(new String[0]);
+    }
+
 }
