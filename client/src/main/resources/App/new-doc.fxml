@@ -5,6 +5,7 @@
 <?import javafx.scene.shape.Circle?>
 <?import javafx.geometry.Insets?>
 
+<?import org.fxmisc.richtext.StyleClassedTextArea?>
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="App.BlankController"
             prefWidth="900" prefHeight="600"
@@ -19,8 +20,17 @@
                 <Separator orientation="VERTICAL" prefHeight="20" style="-fx-opacity: 0.2;"/>
 
                 <HBox spacing="5">
-                    <Button text="B" style="-fx-background-color: #2a2a2a; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
-                    <Button text="I" style="-fx-background-color: #2a2a2a; -fx-text-fill: white; -fx-font-style: italic; -fx-cursor: hand;"/>
+                    <Button fx:id="boldButton"
+                            onAction="#toggleBold"
+                            text="B"
+                            style="-fx-background-color: #2a2a2a;
+                            -fx-text-fill: white;
+                            -fx-font-weight: bold;
+                            -fx-cursor: hand;"/>
+                    <Button fx:id="italicButton"
+                            onAction="#toggleItalic"
+                            text="I"
+                            style="-fx-background-color: #2a2a2a; -fx-text-fill: white; -fx-font-style: italic; -fx-cursor: hand;"/>
                 </HBox>
 
                 <Region HBox.hgrow="ALWAYS" /> <HBox spacing="10">
@@ -31,9 +41,8 @@
             </HBox>
 
             <HBox VBox.vgrow="ALWAYS">
-                <TextArea fx:id="textArea" VBox.vgrow="ALWAYS" HBox.hgrow="ALWAYS"
+                <StyleClassedTextArea fx:id="textArea" VBox.vgrow="ALWAYS" HBox.hgrow="ALWAYS"
                           wrapText="true"
-                          promptText="Start typing..."
                           style="-fx-control-inner-background: #1e1e1e; -fx-text-fill: #d4d4d4; -fx-display-caret: true; -fx-background-color: transparent; -fx-focus-color: transparent;
                           -fx-text-box-border: transparent; -fx-font-family: 'ui-sans-serif'; -fx-font-size: 15;  -fx-prompt-text-fill: gray;"/>
 
@@ -58,8 +67,8 @@
             </HBox>
 
             <HBox spacing="20" style="-fx-padding: 8 15; -fx-background-color: #1a1a1a; -fx-background-radius: 0 0 8 8;">
-                <Label text="Line 3, Col 12" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
-                <Label text="2 editors connected" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
+                <Label fx:id="lineColLabel" text="Line 3, Col 12" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
+                <Label fx:id="connectedLabel" text="2 editors connected" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
             </HBox>
         </VBox>
     </center>

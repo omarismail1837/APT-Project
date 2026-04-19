@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class HelloApplication extends Application {
+    // One open document per application instance
     private static BlockDLL sharedDocument;
 
     public static void setSharedDocument(BlockDLL document) {
@@ -23,6 +24,7 @@ public class HelloApplication extends Application {
         return sharedDocument;
     }
 
+    // Override javafx's default way of creating controllers, we need to create controllers WITH the doc injected
     public static FXMLLoader createLoader(URL fxmlUrl) {
         FXMLLoader loader = new FXMLLoader(fxmlUrl);
         loader.setControllerFactory(type -> {
@@ -43,6 +45,7 @@ public class HelloApplication extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
+        // if somehow ClientMain forgot to set the document, create one anyway so the app doesnt crash
         if (sharedDocument == null) {
             sharedDocument = new BlockDLL();
         }
@@ -53,14 +56,20 @@ public class HelloApplication extends Application {
                     "If running from IntelliJ Main, set run module/classpath to Client module or enable resources output.");
         }
 
+        // build the ui components from the fxml
         FXMLLoader fxmlLoader = createLoader(fxmlUrl);
+
+        // set window title, put the scene inside the window, then show it
         Scene scene = new Scene(fxmlLoader.load(), 1000, 500);
         stage.setTitle("Hello!");
         stage.setScene(scene);
         stage.show();
     }
 
+    // in case IJ runs the class directly without going through mvn properly & the resources folder doesnt get copied,
+    // look for the file directly on disk at its src loc
     private URL resolveFxml(String classpathLocation) throws IOException {
+        // try the normal way first
         URL fromClasspath = HelloApplication.class.getResource(classpathLocation);
         if (fromClasspath != null) {
             return fromClasspath;

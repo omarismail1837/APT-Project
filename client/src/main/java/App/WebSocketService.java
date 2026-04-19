@@ -19,12 +19,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+// comm layer between client & server
 public class WebSocketService {
 
+    // the active websocket connection
+    // volatile = multiple threads can safely read it
+    // StompSession is the object used to send messages
     private volatile StompSession session;
     private final Consumer<Action> onActionReceived;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // actions sent before the connection is established go here
     private final Queue<Action> pendingActions = new ConcurrentLinkedQueue<>();
+
+    // replay past edits first and THEN live actions
     private final Queue<Action> bufferedLiveUpdates = new ConcurrentLinkedQueue<>();
     private final AtomicInteger replayState = new AtomicInteger(0); // 0=none, 1=replaying, 2=ready
 
@@ -35,6 +43,7 @@ public class WebSocketService {
     public void connect(String url) {
         String nativeUrl = normalizeWebSocketUrl(url);
         String sockJsUrl = normalizeHttpUrl(url);
+        // a sys property flag to choose connection strategy. by def it uses SockJS
         boolean nativeFirst = Boolean.parseBoolean(System.getProperty("ws.nativeFirst", "false"));
 
         if (!nativeFirst) {
@@ -101,6 +110,7 @@ public class WebSocketService {
 
         replayState.set(1);
 
+        // live updates channel
         session.subscribe("/topic/updates", new StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) {
@@ -123,6 +133,7 @@ public class WebSocketService {
             }
         });
 
+        // request doc history from server
         session.subscribe("/app/initial-state", new StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) {
@@ -167,6 +178,8 @@ public class WebSocketService {
         }
     }
 
+    // if connected, send immediately
+    // if not, queue it for later
     public void sendAction(Action action) {
         if (action == null) {
             return;
