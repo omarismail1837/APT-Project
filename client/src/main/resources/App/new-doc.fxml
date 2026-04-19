@@ -67,8 +67,8 @@
             </HBox>
 
             <HBox spacing="20" style="-fx-padding: 8 15; -fx-background-color: #1a1a1a; -fx-background-radius: 0 0 8 8;">
-                <Label text="Line 3, Col 12" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
-                <Label text="2 editors connected" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
+                <Label fx:id="lineColLabel" text="Line 3, Col 12" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
+                <Label fx:id="connectedLabel" text="2 editors connected" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
             </HBox>
         </VBox>
     </center>

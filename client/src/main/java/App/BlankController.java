@@ -7,10 +7,8 @@ import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.IndexRange;import javafx.scene.control.TextArea;
-import javafx.scene.control.Button;
-import javafx.scene.control.TextFormatter;
-import org.fxmisc.richtext.StyleClassedTextArea;import org.fxmisc.richtext.model.RichTextChange;
+import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;import org.fxmisc.richtext.StyleClassedTextArea;import org.fxmisc.richtext.model.RichTextChange;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -50,6 +48,8 @@ public class BlankController implements Initializable {
     private Button boldButton;
     @FXML
     private Button italicButton;
+    @FXML private Label lineColLabel;
+    @FXML private Label connectedLabel;
 
     public BlankController(BlockDLL blockDLL) {
         this.blockDLL = (blockDLL != null) ? blockDLL : new BlockDLL();
@@ -68,6 +68,7 @@ public class BlankController implements Initializable {
         repairBlockActionState();
         refreshMapping();
         setUpTextAreaListener();
+        textArea.caretPositionProperty().addListener((obs, oldVal, newVal) -> updateLineCol());
 
         // websocket messages arrive on a background thread, but javafx ui can only be updated from the main thread
         // Platform.runLater() schedules the update to run on the main thread safely
@@ -521,7 +522,6 @@ public class BlankController implements Initializable {
             if (c.getBold() && c.getItalic()) {
                 textArea.setStyleClass(i, i + 1, "bold-italic");
             } else if (c.getBold()) {
-                System.out.println("Character " + i + " is bold");
                 textArea.setStyleClass(i, i + 1, "bold");
             } else if (c.getItalic()) {
                 textArea.setStyleClass(i, i + 1, "italic");
@@ -529,4 +529,23 @@ public class BlankController implements Initializable {
                 textArea.setStyleClass(i, i + 1, "regular");
             }
         }
-    }}
+    }
+
+    private void updateLineCol() {
+        int caretPos = textArea.getCaretPosition();
+        String text = textArea.getText();
+        int line = 1, col = 1;
+
+        for (int i = 0; i < caretPos && i < text.length(); i++) {
+            if (text.charAt(i) == '\n') {
+                line++;
+                col = 1;
+            } else {
+                col++;
+            }
+        }
+        lineColLabel.setText("Line " + line + ", Col " + col);
+        System.out.println("caret=" + caretPos + " line=" + line + " col=" + col);
+        System.out.println("caret=" + caretPos + " textLength=" + text.length() + " first50chars=" + text.substring(0, Math.min(50, text.length())).replace("\n", "\\n"));
+    }
+}
