@@ -1,0 +1,31 @@
+.styled-text-area {
+    -fx-background-color: #1e1e1e;
+}
+
+.styled-text-area .text {
+    -fx-fill: #d4d4d4;
+}
+
+.styled-text-area .content {
+    -fx-background-color: #1e1e1e;
+}
+
+.bold {
+    -fx-font-weight: bold;
+    -fx-fill: #d4d4d4;
+}
+
+.italic {
+    -fx-font-style: italic;
+    -fx-fill: #d4d4d4;
+}
+
+.bold-italic {
+    -fx-font-weight: bold;
+    -fx-font-style: italic;
+    -fx-fill: #d4d4d4;
+}
+
+.regular {
+    -fx-fill: #d4d4d4;
+}

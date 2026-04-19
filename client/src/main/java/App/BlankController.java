@@ -7,8 +7,10 @@ import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.TextArea;
+import javafx.scene.control.IndexRange;import javafx.scene.control.TextArea;
+import javafx.scene.control.Button;
 import javafx.scene.control.TextFormatter;
+import org.fxmisc.richtext.StyleClassedTextArea;import org.fxmisc.richtext.model.RichTextChange;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -43,7 +45,11 @@ public class BlankController implements Initializable {
     private boolean isRemoteUpdate = false;
 
     @FXML
-    private TextArea textArea;
+    private StyleClassedTextArea textArea;
+    @FXML
+    private Button boldButton;
+    @FXML
+    private Button italicButton;
 
     public BlankController(BlockDLL blockDLL) {
         this.blockDLL = (blockDLL != null) ? blockDLL : new BlockDLL();
@@ -85,43 +91,88 @@ public class BlankController implements Initializable {
     // UnaryOperator<TextFormatter.Change> means a function that takes a change and returns a change
     // return change object to apply it and null to cancel the change
     private void setUpTextAreaListener() {
-        textArea.setTextFormatter(new TextFormatter<TextFormatter.Change>(new UnaryOperator<TextFormatter.Change>() {
-            @Override
-            public TextFormatter.Change apply(TextFormatter.Change change) {
-                if (!isRemoteUpdate && change.isContentChange()) {
-                    processChange(change);
-                    int preferredCaret = change.getRangeStart();
-                    if (change.getText() != null && !change.getText().isEmpty()) {
-                        // where the cursor should be after the change
-                        preferredCaret += change.getText().length();
-                    }
-                    rerenderFromBlockDLLAfterLocalChange(preferredCaret);
-                    // Model already updated; cancel direct TextArea mutation and keep UI model-driven.
-                    return null;
-                }
-                return change;
-            }
-        }));
+        textArea.multiRichChanges()
+                .filter(changes -> !isRemoteUpdate)
+                .subscribe(changes -> {
+                    // cancel all changes by re-rendering immediately
+                    changes.forEach(change -> processRichChange(change));
+                    rerender(textArea.getCaretPosition());
+                });
     }
 
-    private void rerenderFromBlockDLLAfterLocalChange(int preferredCaret) {
+    private void rerender(int preferredCaret) {
         boolean previousRemoteFlag = isRemoteUpdate;
-        isRemoteUpdate = true;
+        isRemoteUpdate = true; // make listener ignore the edits
         try {
-            double scrollTop = textArea != null ? textArea.getScrollTop() : 0;
-            double scrollLeft = textArea != null ? textArea.getScrollLeft() : 0;
             refreshMapping();
-            textArea.setText(blockDLL.collectText());
+            // set text BEFORE styling
+            textArea.replaceText(blockDLL.collectText());
+            applyStyles();
+
+            // preventing a crash when a remote edit shrinks the document below current cursor position
+            // Math.min(caret, max) -> don't go past the end of the document (clamp)
+            // Math.max(....) -> dont go before the start
             int max = textArea.getLength();
             int safeCaret = Math.max(0, Math.min(preferredCaret, max));
             textArea.selectRange(safeCaret, safeCaret);
-            textArea.setScrollTop(scrollTop);
-            textArea.setScrollLeft(scrollLeft);
         } finally {
             isRemoteUpdate = previousRemoteFlag;
         }
     }
 
+    private void processRichChange(RichTextChange<?, ?, ?> change)
+    {
+        int idx = change.getPosition();
+
+        // DELETE first
+        // to account for selecting text & typing over it
+        if (!change.getRemoved().getText().isEmpty()) {
+            int deleteCount = change.getRemoved().getText().length();
+            for (int i = 0; i < deleteCount; i++) {
+                if (idx >= visibleNodes.size()) {
+                    break;
+                }
+
+                String targetID = visibleNodes.get(idx).getCharID();
+                long thisClock = ++clock;
+                long now = System.currentTimeMillis();
+                String actType = "DELETE";
+
+                Action action = new Action(thisClock, now, mySiteID, docID, actType, targetID, null, null);
+                blockDLL.applyAction(action);
+                seenActionIds.add(buildActionId(action));
+                wsService.sendAction(action);
+                refreshMapping();
+            }
+        }
+
+        // INSERT
+        if (!change.getInserted().getText().isEmpty()) {
+            ensureSeedHeadMapped();
+            String rootID = getSeedHeadID();
+            if (rootID == null) {
+                return;
+            }
+            String text = change.getInserted().getText();
+
+            String parentID = resolveParentIDForInsert(idx, rootID);
+
+            for (int i = 0; i < text.length(); i++) {
+                char nextChar = text.charAt(i);
+                long thisClock = ++clock;
+                long now = System.currentTimeMillis();
+
+                CharNode newNode = new CharNode(mySiteID, thisClock, now, nextChar, parentID);
+
+                Action action = new Action(thisClock, now, mySiteID, docID, "INSERT", parentID, null, String.valueOf(nextChar));
+                blockDLL.applyAction(action);
+                seenActionIds.add(buildActionId(action));
+                wsService.sendAction(action);
+                parentID = newNode.getCharID();
+            }
+            refreshMapping();
+        }
+    }
 
     // Recv change object which describes what the user just did - either insert, delete, or both
     private void processChange(TextFormatter.Change change) {
@@ -293,34 +344,8 @@ public class BlankController implements Initializable {
 
         // p2: APPLY
         seenActionIds.add(actionId);
-        isRemoteUpdate = true;
-        try {
-            // save caret, anchor, and scroll position
-            // caret = where the cursor is
-            int caret = textArea != null ? textArea.getCaretPosition() : 0;
-            // anchor = where a text selection started, if no selection -> anchor = caret
-            int anchor = textArea != null ? textArea.getAnchor() : 0;
-            double scrollTop = textArea != null ? textArea.getScrollTop() : 0;
-            double scrollLeft = textArea != null ? textArea.getScrollLeft() : 0;
-            applyRemoteActionCompat(incomingAction);
-            textArea.setText(blockDLL.collectText());
-
-            if (textArea != null) {
-                int max = textArea.getLength();
-                // preventing a crash when a remote edit shrinks the document below current cursor position
-                // Math.min(caret, max) -> don't go past the end of the document (clamp)
-                // Math.max(....) -> dont go before the start
-                int safeCaret = Math.max(0, Math.min(caret, max));
-                int safeAnchor = Math.max(0, Math.min(anchor, max));
-                textArea.selectRange(safeAnchor, safeCaret);
-                textArea.setScrollTop(scrollTop);
-                textArea.setScrollLeft(scrollLeft);
-            }
-
-            refreshMapping();
-        } finally {
-            isRemoteUpdate = false;
-        }
+        blockDLL.applyAction(incomingAction);
+        rerender(textArea.getCaretPosition());
     }
 
     private void applyRemoteActionCompat(Action action) {
@@ -424,4 +449,84 @@ public class BlankController implements Initializable {
         }
         return action.getDocumentID() + ":" + action.getSiteID() + ":" + action.getClock();
     }
-}
+
+    @FXML
+    private void toggleBold() {
+        IndexRange iRange = textArea.getSelection();
+        if (iRange.getLength() == 0) return;
+        int S = iRange.getStart();
+        int E = iRange.getEnd() - 1;
+
+        if (S < 0 || E >= visibleNodes.size()) return;
+
+        String startCharID = visibleNodes.get(S).getCharID();
+        String endCharID = visibleNodes.get(E).getCharID();
+
+        boolean allBold = true;
+        for (int i = S; i <= E; i++) {
+            if (!visibleNodes.get(i).getBold()) {
+                allBold = false;
+                break;
+            }
+        }
+        String extraData = allBold ? "false" : "true";
+
+        long thisClock = ++clock;
+        long now = System.currentTimeMillis();
+
+        Action action = new Action(thisClock, now, mySiteID, docID, "BOLD", startCharID, endCharID, extraData);
+        blockDLL.applyAction(action);
+        seenActionIds.add(buildActionId(action));
+        wsService.sendAction(action);
+        rerender(textArea.getCaretPosition());
+    }
+
+    @FXML
+    private void toggleItalic() {
+        IndexRange iRange = textArea.getSelection();
+        if (iRange.getLength() == 0) return;
+        int S = iRange.getStart();
+        int E = iRange.getEnd() - 1;
+
+        if (S < 0 || E >= visibleNodes.size()) return;
+
+        String startCharID = visibleNodes.get(S).getCharID();
+        String endCharID = visibleNodes.get(E).getCharID();
+
+        boolean allItalic = true;
+        for (int i = S; i <= E; i++) {
+            if (!visibleNodes.get(i).getItalic()) {
+                allItalic = false;
+                break;
+            }
+        }
+        String extraData = allItalic ? "false" : "true";
+
+        long thisClock = ++clock;
+        long now = System.currentTimeMillis();
+
+        Action action = new Action(thisClock, now, mySiteID, docID, "ITALIC", startCharID, endCharID, extraData);
+        blockDLL.applyAction(action);
+        seenActionIds.add(buildActionId(action));
+        wsService.sendAction(action);
+        rerender(textArea.getCaretPosition());
+    }
+
+
+    private void applyStyles() {
+        int docLength = textArea.getLength();
+        for (int i = 0; i < visibleNodes.size(); i++) {
+            if (i >= docLength) break; // safety check
+            CharNode c = visibleNodes.get(i);
+            if (c.getBold() && c.getItalic()) {
+                textArea.setStyleClass(i, i + 1, "bold-italic");
+            } else if (c.getBold()) {
+                System.out.println("Character " + i + " is bold");
+                textArea.setStyleClass(i, i + 1, "bold");
+            } else if (c.getItalic()) {
+                textArea.setStyleClass(i, i + 1, "italic");
+            } else {
+                textArea.setStyleClass(i, i + 1, "regular");
+            }
+        }
+    }}

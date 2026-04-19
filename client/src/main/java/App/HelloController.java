@@ -37,6 +37,13 @@ public class HelloController {
         FXMLLoader loader = HelloApplication.createLoader(fxmlUrl);
         Parent root = loader.load();
         Scene scene = new Scene(root);
+        URL cssUrl = HelloApplication.class.getResource("/App/editor.css");
+        if (cssUrl == null) {
+            System.out.println("CSS NOT FOUND");
+        } else {
+            System.out.println("CSS found: " + cssUrl);
+            scene.getStylesheets().add(cssUrl.toExternalForm());
+        }
         stage.setScene(scene);
         stage.show();
     }
