@@ -102,7 +102,7 @@ public class CharDLL implements ICRDT<CharNode> {
     // function needed in block operations to split a single block
     public CharDLL splitAt(int siteID, long clock, long time, String charID) {
         // Use a reserved sentinel site ID so split heads never collide with real character IDs.
-        CharDLL newDLL = new CharDLL(-1, clock, time);
+        CharDLL newDLL = new CharDLL(-1*siteID, clock, time);
         CharNode ptr = map.get(charID);
         if (ptr == null) return newDLL;
 
