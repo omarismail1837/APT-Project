@@ -29,7 +29,12 @@ public class ChatController {
             return null;
         }
 
-        document.applyAction(update);
+        String type = update.getActionType();
+        if (type != null && !type.equals("CURSOR")) {
+            document.applyAction(update);
+        }
+
+//        document.applyAction(update);
         return update;
     }
 

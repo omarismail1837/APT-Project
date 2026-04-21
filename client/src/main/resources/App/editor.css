@@ -29,3 +29,9 @@
 .regular {
     -fx-fill: #d4d4d4;
 }
+
+.remote-cursor-0 { -rtfx-background-color: rgba(59,130,246,0.35); }
+.remote-cursor-1 { -rtfx-background-color: rgba(16,185,129,0.35); }
+.remote-cursor-2 { -rtfx-background-color: rgba(245,158,11,0.35); }
+.remote-cursor-3 { -rtfx-background-color: rgba(139,92,246,0.35); }
+.remote-cursor-4 { -rtfx-background-color: rgba(239,68,68,0.35); }

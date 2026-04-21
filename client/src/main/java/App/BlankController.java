@@ -7,8 +7,8 @@ import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;import org.fxmisc.richtext.StyleClassedTextArea;import org.fxmisc.richtext.model.RichTextChange;
+import javafx.geometry.Pos;import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;import javafx.scene.layout.HBox;import javafx.scene.layout.VBox;import javafx.scene.paint.Color;import javafx.scene.shape.Circle;import org.fxmisc.richtext.StyleClassedTextArea;import org.fxmisc.richtext.model.RichTextChange;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -41,6 +41,13 @@ public class BlankController implements Initializable {
 
     // when true, the text change listener ignores the change so it doesnt lead to an infinite loop
     private boolean isRemoteUpdate = false;
+    private final Map<Integer, String> remoteCursorPositions = new LinkedHashMap<>();
+    private final Map<Integer, String> remoteUserNames = new LinkedHashMap<>();
+    private final Map<Integer, String> siteColorMap = new HashMap<>();
+    private static final String[] USER_COLORS = {"#3b82f6","#10b981","#f59e0b","#8b5cf6"};
+    private long lastCursorBroadcastMs = 0;
+
+    @FXML private VBox activeUsersBox;
 
     @FXML
     private StyleClassedTextArea textArea;
@@ -68,7 +75,10 @@ public class BlankController implements Initializable {
         repairBlockActionState();
         refreshMapping();
         setUpTextAreaListener();
-        textArea.caretPositionProperty().addListener((obs, oldVal, newVal) -> updateLineCol());
+        textArea.caretPositionProperty().addListener((obs, oldVal, newVal) -> {
+            updateLineCol();
+            broadcastCursorPosition(newVal.intValue());
+        });
 
         // websocket messages arrive on a background thread, but javafx ui can only be updated from the main thread
         // Platform.runLater() schedules the update to run on the main thread safely
@@ -87,6 +97,27 @@ public class BlankController implements Initializable {
             }
         });
         wsService.connect("https://apt-project-production-326d.up.railway.app/ws-connect");
+        updateActiveUsersPanel();
+    }
+
+    private void broadcastCursorPosition(int caretPos) {
+        long now = System.currentTimeMillis();
+        if (now - lastCursorBroadcastMs < 80) return;
+        lastCursorBroadcastMs = now;
+
+        String charID;
+        if (visibleNodes.isEmpty() || caretPos == 0) {
+            charID = getSeedHeadID();
+        } else {
+            int idx = Math.min(caretPos, visibleNodes.size()) - 1;
+            charID = visibleNodes.get(idx).getCharID();
+        }
+        if (charID == null) return;
+
+        // moving cursors doesnt inc clock
+        Action action = new Action(clock, now, mySiteID, docID,
+                "CURSOR", charID, null, "User-" + (mySiteID % 1000));
+        wsService.sendAction(action);
     }
 
     // UnaryOperator<TextFormatter.Change> means a function that takes a change and returns a change
@@ -327,6 +358,9 @@ public class BlankController implements Initializable {
 
     // runs whenever another user edits
     public void handleRemoteAction(Action incomingAction) {
+        System.out.println("[REMOTE] type=" + incomingAction.getActionType()
+                + " site=" + incomingAction.getSiteID()
+                + " mysite=" + mySiteID);
         // p1: GUARDS
         if (incomingAction == null) {
             return;
@@ -529,6 +563,7 @@ public class BlankController implements Initializable {
                 textArea.setStyleClass(i, i + 1, "regular");
             }
         }
+        applyRemoteCursorHighlights();
     }
 
     private void updateLineCol() {
@@ -547,5 +582,51 @@ public class BlankController implements Initializable {
         lineColLabel.setText("Line " + line + ", Col " + col);
         System.out.println("caret=" + caretPos + " line=" + line + " col=" + col);
         System.out.println("caret=" + caretPos + " textLength=" + text.length() + " first50chars=" + text.substring(0, Math.min(50, text.length())).replace("\n", "\\n"));
+    }
+
+    private String colorForSite(int siteID) {
+        return siteColorMap.computeIfAbsent(siteID,
+                id -> USER_COLORS[Math.abs(id) % USER_COLORS.length]);
+    }
+
+    private void updateActiveUsersPanel() {
+        if (activeUsersBox == null) return;
+        activeUsersBox.getChildren().clear();
+        activeUsersBox.getChildren().add(makeUserRow("You", "#ff5f56"));
+        for (Map.Entry<Integer, String> e : remoteUserNames.entrySet()) {
+            activeUsersBox.getChildren().add(makeUserRow(e.getValue(), colorForSite(e.getKey())));
+        }
+        connectedLabel.setText((1 + remoteUserNames.size()) + " editors connected");
+    }
+
+    private HBox makeUserRow(String name, String color) {
+        Circle dot = new Circle(4);
+        dot.setFill(Color.web(color));
+        Label label = new Label(name);
+        label.setStyle("-fx-text-fill: #e0e0e0;");
+        HBox row = new HBox(10, dot, label);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
+    }
+
+    private void applyRemoteCursorHighlights() {
+        Map<String, Integer> charToSite = new HashMap<>();
+        for (Map.Entry<Integer, String> e : remoteCursorPositions.entrySet()) {
+            charToSite.put(e.getValue(), e.getKey());
+        }
+        int docLength = textArea.getLength();
+        for (int i = 0; i < visibleNodes.size(); i++) {
+            if (i >= docLength) break;
+            String cid = visibleNodes.get(i).getCharID();
+            if (charToSite.containsKey(cid)) {
+                int colorIdx = Math.abs(charToSite.get(cid)) % USER_COLORS.length;
+                CharNode c = visibleNodes.get(i);
+                String base = (c.getBold() && c.getItalic()) ? "bold-italic"
+                        : c.getBold()   ? "bold"
+                        : c.getItalic() ? "italic"
+                        : "regular";
+                textArea.setStyleClass(i, i + 1, base + " remote-cursor-" + colorIdx);
+            }
+        }
     }
 }
