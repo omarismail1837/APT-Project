@@ -265,12 +265,15 @@ public class BlankController implements Initializable {
         // to account for selecting text & typing over it
         if (change.getRangeStart() < change.getRangeEnd()) {
             int deleteCount = change.getRangeEnd() - change.getRangeStart();
+            List<CharNode> snapshot = new ArrayList<>(visibleNodes);
+
             for (int i = 0; i < deleteCount; i++) {
-                if (idx >= visibleNodes.size()) {
+                int targetIdx = idx + i;
+                if (targetIdx >= snapshot.size()) {
                     break;
                 }
 
-                String targetID = visibleNodes.get(idx).getCharID();
+                String targetID = snapshot.get(targetIdx).getCharID();
                 long thisClock = ++clock;
                 long now = System.currentTimeMillis();
                 String actType = "DELETE";
@@ -279,8 +282,9 @@ public class BlankController implements Initializable {
                 blockDLL.applyAction(action);
                 seenActionIds.add(buildActionId(action));
                 wsService.sendAction(action);
-                refreshMapping();
             }
+
+            refreshMapping();
         }
 
         // INSERT
