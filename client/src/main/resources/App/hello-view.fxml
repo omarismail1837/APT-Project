@@ -3,33 +3,57 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.geometry.Insets?>
 
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="App.HelloController"
             prefWidth="900"
-            prefHeight="600">
-    <top>
-        <!--spacing = 8 -> put 8 pixels between each child inside it
-        style="-fx-padding: 10; -fx-background-color: #f5f5f5;" — this is JavaFX CSS.
-        JavaFX CSS works exactly like web CSS except every property has -fx- in front.-->
-        <Label text="Welcome!"/>
-    </top>
+            prefHeight="600"
+            styleClass="root-pane"
+            stylesheets="@landing.css">
+
 
     <center>
-        <HBox>
-            <Button fx:id="newDocButton"
-                    onAction="#newDoc"
-                    text="New Document"/>
-            <Button text="Browse"/>
-            <VBox>
-                <TextField promptText="Session Code"></TextField>
-                <Label text="Join Session"/>
+        <StackPane styleClass="body-pane">
+            <VBox styleClass="card" spacing="10" maxWidth="420">
+
+                <Label text="Welcome back" styleClass="card-title"/>
+                <Label text="Start writing or join an existing session." styleClass="card-sub"/>
+
+                <Button fx:id="newDocButton"
+                        text="New document"
+                        onAction="#newDoc"
+                        styleClass="btn-primary"
+                        maxWidth="Infinity"/>
+
+                <Button text="Browse documents"
+                        styleClass="btn-secondary"
+                        maxWidth="Infinity"/>
+
+                <HBox styleClass="divider-row" alignment="CENTER" spacing="10">
+                    <Separator HBox.hgrow="ALWAYS"/>
+                    <Label text="or join with a code" styleClass="divider-label"/>
+                    <Separator HBox.hgrow="ALWAYS"/>
+                </HBox>
+
+                <HBox spacing="8">
+                    <TextField fx:id="sessionCodeField"
+                               promptText="Session code"
+                               styleClass="join-input"
+                               HBox.hgrow="ALWAYS"/>
+                    <Button text="Join session"
+                            styleClass="btn-secondary"
+                            minWidth="110"/>
+                </HBox>
+
             </VBox>
-        </HBox>
+        </StackPane>
     </center>
 
 </BorderPane>

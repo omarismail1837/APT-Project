@@ -1,0 +1,130 @@
+* {
+    -fx-font-family: "Segoe UI", "System";
+}
+
+.root-pane {
+    -fx-background-color: #f0eeea;
+}
+
+.toolbar {
+    -fx-background-color: white;
+    -fx-border-color: #e0ddd6;
+    -fx-border-width: 0 0 0.5 0;
+    -fx-padding: 14 24 14 24;
+}
+
+.toolbar-dot {
+    -fx-background-color: #378ADD;
+    -fx-background-radius: 50%;
+    -fx-min-width: 8px;
+    -fx-min-height: 8px;
+    -fx-max-width: 8px;
+    -fx-max-height: 8px;
+}
+
+.toolbar-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1a1a1a;
+}
+
+.toolbar-sub {
+    -fx-font-size: 13px;
+    -fx-text-fill: #888780;
+}
+
+
+.body-pane {
+    -fx-alignment: CENTER;
+    -fx-padding: 48;
+}
+
+.card {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-color: #e0ddd6;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 12;
+    -fx-padding: 36 40 36 40;
+}
+
+.card-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1a1a1a;
+    -fx-padding: 0 0 6 0;
+}
+
+.card-sub {
+    -fx-font-size: 14px;
+    -fx-text-fill: #888780;
+    -fx-padding: 0 0 24 0;
+}
+
+.btn-primary {
+    -fx-background-color: #185FA5;
+    -fx-text-fill: #E6F1FB;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 10 0 10 0;
+    -fx-cursor: hand;
+    -fx-margin: 0 0 12 0;
+}
+
+.btn-primary:hover {
+    -fx-background-color: #1A6DB8;
+}
+
+.btn-primary:pressed {
+    -fx-background-color: #144f8a;
+}
+
+.btn-secondary {
+    -fx-background-color: transparent;
+    -fx-text-fill: #1a1a1a;
+    -fx-font-size: 14px;
+    -fx-background-radius: 8;
+    -fx-border-color: #c8c5bc;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 8;
+    -fx-padding: 9 16 9 16;
+    -fx-cursor: hand;
+    -fx-margin: 0 0 0 0;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: #f0eeea;
+}
+
+.btn-secondary:pressed {
+    -fx-background-color: #e4e1db;
+}
+
+.divider-row {
+    -fx-padding: 20 0 16 0;
+}
+
+.divider-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #b4b2a9;
+}
+
+.join-input {
+    -fx-background-color: #f8f7f4;
+    -fx-border-color: #e0ddd6;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-size: 14px;
+    -fx-text-fill: #1a1a1a;
+    -fx-prompt-text-fill: #b4b2a9;
+    -fx-padding: 9 12 9 12;
+}
+
+.join-input:focused {
+    -fx-border-color: #378ADD;
+    -fx-border-width: 1;
+    -fx-background-color: white;
+}

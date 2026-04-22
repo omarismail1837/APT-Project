@@ -107,6 +107,7 @@ public class BlankController implements Initializable {
         javafx.application.Platform.runLater(() -> {
             broadcastCursorPosition(textArea.getCaretPosition());
         });
+        textArea.setStyle("-fx-caret-color: " + colorForSite(mySiteID) + ";");
     }
 
     private void broadcastCursorPosition(int caretPos) {
@@ -707,6 +708,7 @@ public class BlankController implements Initializable {
 
         activeUsersBox.getChildren().clear();
         activeUsersBox.getChildren().add(makeUserRow("You", colorForSite(mySiteID)));
+
 
         List<Integer> activeSites = visibleSites();
 
