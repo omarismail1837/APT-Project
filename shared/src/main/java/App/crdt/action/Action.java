@@ -12,6 +12,7 @@ public class Action {
     String startCharID;
     String endCharID;
     String extraData;
+    int colorIndex = -1;
 
     public Action(long clock, long time, int SiteID, String documentID, String actionType, String startCharID, String endCharID, String extraData) {
         this.clock = clock;
@@ -22,6 +23,7 @@ public class Action {
         this.startCharID = startCharID;
         this.endCharID = endCharID;
         this.extraData = extraData; //holds JSON if pasting, character if inserting, true/false if italic/bold
+        this.colorIndex = -1;
     }
     public Action() {} //required for JSON
     //getters
@@ -33,6 +35,7 @@ public class Action {
     public String getStartCharID() {return startCharID;}
     public String getEndCharID() {return endCharID;}
     public String getExtraData() {return extraData;}
+    public int getColorIndex() {return colorIndex;}
 
     //setters
     public void setClock(long clock) {this.clock = clock;}
@@ -43,6 +46,7 @@ public class Action {
     public void setStartCharID(String startCharID) {this.startCharID = startCharID;}
     public void setEndCharID(String endCharID) {this.endCharID = endCharID;}
     public void setExtraData(String extraData) {this.extraData = extraData;}
+    public void setColorIndex(int colorIndex) {this.colorIndex = colorIndex;}
 
     public String getActionId() {
         return documentID + ":" + siteID + ":" + clock;
@@ -70,6 +74,7 @@ public class Action {
                 ", start='" + startCharID + '\'' +
                 ", end='" + endCharID + '\'' +
                 ", extra='" + extraData + '\'' +
+                ", colorIndex='" + colorIndex + '\'' +
                 '}';
     }
 

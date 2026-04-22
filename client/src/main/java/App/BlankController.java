@@ -43,6 +43,7 @@ public class BlankController implements Initializable {
     private boolean isRemoteUpdate = false;
     private final Map<Integer, String> remoteCursorPositions = new LinkedHashMap<>();
     private final Map<Integer, String> remoteUserNames = new LinkedHashMap<>();
+    private final Map<Integer, Integer> siteColorIndices = new HashMap<>();
     private static final String[] USER_COLORS = {"#3b82f6","#10b981","#f59e0b","#8b5cf6"};
     private long lastCursorBroadcastMs = 0;
 
@@ -435,6 +436,10 @@ public class BlankController implements Initializable {
             return; // duplicate prevention
         }
 
+        if (incomingAction.getColorIndex() >= 0) {
+            siteColorIndices.put(incomingAction.getSiteID(), incomingAction.getColorIndex());
+        }
+
         rememberRemoteUser(incomingAction);
 
         if ("CURSOR".equals(incomingAction.getActionType())) {
@@ -687,19 +692,12 @@ public class BlankController implements Initializable {
     }
 
     private String colorForSite(int siteID) {
-        if (siteID == mySiteID) {
-            return USER_COLORS[0];
+        Integer idx = siteColorIndices.get(siteID);
+        if (idx == null) {
+            idx = Math.abs(siteID) % USER_COLORS.length;
         }
-
-        List<Integer> sites = visibleSites();
-        int idx = sites.indexOf(siteID);
-
-        if (idx < 0) {
-            return USER_COLORS[USER_COLORS.length - 1];
-        }
-
-        int colorIdx = Math.min(idx + 1, USER_COLORS.length - 1);
-        return USER_COLORS[colorIdx];
+        idx = Math.max(0, Math.min(idx, USER_COLORS.length - 1));
+        return USER_COLORS[idx];
     }
 
 
@@ -753,13 +751,11 @@ public class BlankController implements Initializable {
     }
 
     private int colorIndexForSite(int siteID) {
-        String color = colorForSite(siteID);
-        for (int i = 0; i < USER_COLORS.length; i++) {
-            if (USER_COLORS[i].equals(color)) {
-                return i;
-            }
+        Integer idx = siteColorIndices.get(siteID);
+        if (idx == null) {
+            idx = Math.abs(siteID) % USER_COLORS.length;
         }
-        return 0;
+        return Math.max(0, Math.min(idx, USER_COLORS.length - 1));
     }
 
     private List<Integer> visibleSites() {
