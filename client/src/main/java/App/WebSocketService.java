@@ -138,8 +138,8 @@ public class WebSocketService {
             }
         });
 
-        // request doc history from server
-        session.subscribe("/app/initial-state", new StompFrameHandler() {
+        // receive initial state in batches
+        session.subscribe("/user/queue/initial-state-batch", new StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) {
                 return List.class;
@@ -148,8 +148,6 @@ public class WebSocketService {
             @Override
             public void handleFrame(StompHeaders headers, Object payload) {
                 if (!(payload instanceof List<?> payloadList)) {
-                    replayState.set(2);
-                    drainBufferedLiveUpdates();
                     return;
                 }
 
@@ -159,11 +157,27 @@ public class WebSocketService {
                         onActionReceived.accept(action);
                     }
                 }
+                System.out.println("[WS] Received initial-state batch: size=" + payloadList.size());
+            }
+        });
 
+        // receive completion signal
+        session.subscribe("/user/queue/initial-state-done", new StompFrameHandler() {
+            @Override
+            public Type getPayloadType(StompHeaders headers) {
+                return String.class;
+            }
+
+            @Override
+            public void handleFrame(StompHeaders headers, Object payload) {
+                System.out.println("[WS] Initial-state complete, draining buffered live updates");
                 replayState.set(2);
                 drainBufferedLiveUpdates();
             }
         });
+
+        // request initial state from server (triggers batch sending)
+        session.send("/app/initial-state", "");
     }
 
     private Action convertToAction(Object payload) {
