@@ -35,9 +35,11 @@ public class WebSocketService {
     // replay past edits first and THEN live actions
     private final Queue<Action> bufferedLiveUpdates = new ConcurrentLinkedQueue<>();
     private final AtomicInteger replayState = new AtomicInteger(0); // 0=none, 1=replaying, 2=ready
+    private final Runnable onConnected;
 
-    public WebSocketService(Consumer<Action> onActionReceived) {
+    public WebSocketService(Consumer<Action> onActionReceived, Runnable onConnected) {
         this.onActionReceived = onActionReceived;
+        this.onConnected = onConnected;
     }
 
     public void connect(String url) {
@@ -94,6 +96,9 @@ public class WebSocketService {
                 System.out.println("[WS] Connected via " + transportName + ". Session=" + s.getSessionId());
                 subscribeToTopics();
                 flushPendingActions();
+                if (onConnected != null) {
+                    onConnected.run();
+                }
             }
 
             @Override

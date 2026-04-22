@@ -43,7 +43,6 @@ public class BlankController implements Initializable {
     private boolean isRemoteUpdate = false;
     private final Map<Integer, String> remoteCursorPositions = new LinkedHashMap<>();
     private final Map<Integer, String> remoteUserNames = new LinkedHashMap<>();
-    private final Map<Integer, String> siteColorMap = new HashMap<>();
     private static final String[] USER_COLORS = {"#3b82f6","#10b981","#f59e0b","#8b5cf6"};
     private long lastCursorBroadcastMs = 0;
 
@@ -98,9 +97,15 @@ public class BlankController implements Initializable {
                     }
                 });
             }
-        });
+        }, () -> javafx.application.Platform.runLater(() ->
+                broadcastCursorPosition(textArea.getCaretPosition())));
+
         wsService.connect("https://apt-project-production-326d.up.railway.app/ws-connect");
         updateActiveUsersPanel();
+
+        javafx.application.Platform.runLater(() -> {
+            broadcastCursorPosition(textArea.getCaretPosition());
+        });
     }
 
     private void broadcastCursorPosition(int caretPos) {
@@ -109,12 +114,14 @@ public class BlankController implements Initializable {
         lastCursorBroadcastMs = now;
 
         String charID;
-        if (visibleNodes.isEmpty() || caretPos == 0) {
+        if (visibleNodes.isEmpty()) {
             charID = getSeedHeadID();
+        } else if (caretPos < visibleNodes.size()) {
+            charID = visibleNodes.get(caretPos).getCharID();
         } else {
-            int idx = Math.min(caretPos, visibleNodes.size()) - 1;
-            charID = visibleNodes.get(idx).getCharID();
+            charID = visibleNodes.get(visibleNodes.size() - 1).getCharID();
         }
+
         if (charID == null) return;
 
         // increment clock so that CURSOR actions have a unique id
@@ -141,6 +148,7 @@ public class BlankController implements Initializable {
                     javafx.application.Platform.runLater(() -> {
                         try {
                             rerender(caretSnapshot);
+                            broadcastCursorPosition(textArea.getCaretPosition());
                         } finally {
                             isRemoteUpdate = previousRemoteFlag;
                         }
@@ -427,14 +435,12 @@ public class BlankController implements Initializable {
             return; // duplicate prevention
         }
 
+        rememberRemoteUser(incomingAction);
+
         if ("CURSOR".equals(incomingAction.getActionType())) {
             int siteID = incomingAction.getSiteID();
             if (siteID != mySiteID) {
                 remoteCursorPositions.put(siteID, incomingAction.getStartCharID());
-                String userName = incomingAction.getExtraData(); // "User-XXXX"
-                if (userName != null) {
-                    remoteUserNames.put(siteID, userName);
-                }
 
                 boolean previousRemoteFlag = isRemoteUpdate;
                 isRemoteUpdate = true;
@@ -452,6 +458,31 @@ public class BlankController implements Initializable {
         seenActionIds.add(actionId);
         blockDLL.applyAction(incomingAction);
         rerender(textArea.getCaretPosition());
+    }
+
+    private void rememberRemoteUser(Action incomingAction) {
+        if (incomingAction == null) return;
+
+        int siteID = incomingAction.getSiteID();
+        if (siteID == mySiteID) return;
+
+        String userName = remoteUserNames.get(siteID);
+
+        if ("CURSOR".equals(incomingAction.getActionType())) {
+            String extra = incomingAction.getExtraData();
+            if (extra != null && !extra.isBlank()) {
+                userName = extra;
+            }
+        }
+
+        if (userName == null || userName.isBlank()) {
+            userName = "User-" + Math.abs(siteID % 1000);
+        }
+
+        if (!userName.equals(remoteUserNames.get(siteID))) {
+            remoteUserNames.put(siteID, userName);
+            updateActiveUsersPanel();
+        }
     }
 
     private void applyRemoteActionCompat(Action action) {
@@ -656,19 +687,39 @@ public class BlankController implements Initializable {
     }
 
     private String colorForSite(int siteID) {
-        return siteColorMap.computeIfAbsent(siteID,
-                id -> USER_COLORS[Math.abs(id) % USER_COLORS.length]);
+        if (siteID == mySiteID) {
+            return USER_COLORS[0];
+        }
+
+        List<Integer> sites = visibleSites();
+        int idx = sites.indexOf(siteID);
+
+        if (idx < 0) {
+            return USER_COLORS[USER_COLORS.length - 1];
+        }
+
+        int colorIdx = Math.min(idx + 1, USER_COLORS.length - 1);
+        return USER_COLORS[colorIdx];
     }
+
+
 
     private void updateActiveUsersPanel() {
         if (activeUsersBox == null) return;
+
         activeUsersBox.getChildren().clear();
-        activeUsersBox.getChildren().add(makeUserRow("You", "#ff5f56"));
-        for (Map.Entry<Integer, String> e : remoteUserNames.entrySet()) {
-            activeUsersBox.getChildren().add(makeUserRow(e.getValue(), colorForSite(e.getKey())));
+        activeUsersBox.getChildren().add(makeUserRow("You", colorForSite(mySiteID)));
+
+        List<Integer> activeSites = visibleSites();
+
+        for (int siteID : activeSites) {
+            String name = remoteUserNames.getOrDefault(siteID, "User-" + Math.abs(siteID % 1000));
+            activeUsersBox.getChildren().add(makeUserRow(name, colorForSite(siteID)));
         }
-        connectedLabel.setText((1 + remoteUserNames.size()) + " editors connected");
+
+        connectedLabel.setText((1 + activeSites.size()) + " editors connected");
     }
+
 
     private HBox makeUserRow(String name, String color) {
         Circle dot = new Circle(4);
@@ -690,14 +741,37 @@ public class BlankController implements Initializable {
             if (i >= docLength) break;
             String cid = visibleNodes.get(i).getCharID();
             if (charToSite.containsKey(cid)) {
-                int colorIdx = Math.abs(charToSite.get(cid)) % USER_COLORS.length;
+                int colorIdx = colorIndexForSite(charToSite.get(cid));
                 CharNode c = visibleNodes.get(i);
                 String base = (c.getBold() && c.getItalic()) ? "bold-italic"
                         : c.getBold()   ? "bold"
                         : c.getItalic() ? "italic"
                         : "regular";
-                textArea.setStyleClass(i, i + 1, base + " remote-cursor-" + colorIdx);
+                textArea.setStyle(i, i + 1, Arrays.asList(base, "remote-cursor-" + colorIdx));
             }
         }
     }
+
+    private int colorIndexForSite(int siteID) {
+        String color = colorForSite(siteID);
+        for (int i = 0; i < USER_COLORS.length; i++) {
+            if (USER_COLORS[i].equals(color)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    private List<Integer> visibleSites() {
+        List<Integer> sites = new ArrayList<>(remoteCursorPositions.keySet());
+        Collections.sort(sites);
+
+        if (sites.size() > 3) {
+            sites = sites.subList(0, 3);
+        }
+
+        return sites;
+    }
+
+
 }
