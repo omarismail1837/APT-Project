@@ -77,8 +77,11 @@ public class BlankController implements Initializable {
         setUpTextAreaListener();
         textArea.caretPositionProperty().addListener((obs, oldVal, newVal) -> {
             updateLineCol();
-            broadcastCursorPosition(newVal.intValue());
+            if (!isRemoteUpdate) {
+                broadcastCursorPosition(newVal.intValue());
+            }
         });
+
 
         // websocket messages arrive on a background thread, but javafx ui can only be updated from the main thread
         // Platform.runLater() schedules the update to run on the main thread safely
@@ -114,9 +117,13 @@ public class BlankController implements Initializable {
         }
         if (charID == null) return;
 
-        // moving cursors doesnt inc clock
-        Action action = new Action(clock, now, mySiteID, docID,
+        // increment clock so that CURSOR actions have a unique id
+        long cursorClock = ++clock;
+        Action action = new Action(cursorClock, now, mySiteID, docID,
                 "CURSOR", charID, null, "User-" + (mySiteID % 1000));
+
+        seenActionIds.add(buildActionId(action));
+
         wsService.sendAction(action);
     }
 
@@ -126,11 +133,21 @@ public class BlankController implements Initializable {
         textArea.multiRichChanges()
                 .filter(changes -> !isRemoteUpdate)
                 .subscribe(changes -> {
-                    // cancel all changes by re-rendering immediately
                     changes.forEach(change -> processRichChange(change));
-                    rerender(textArea.getCaretPosition());
+                    int caretSnapshot = textArea.getCaretPosition();
+
+                    boolean previousRemoteFlag = isRemoteUpdate;
+                    isRemoteUpdate = true;
+                    javafx.application.Platform.runLater(() -> {
+                        try {
+                            rerender(caretSnapshot);
+                        } finally {
+                            isRemoteUpdate = previousRemoteFlag;
+                        }
+                    });
                 });
     }
+
 
     private void rerender(int preferredCaret) {
         boolean previousRemoteFlag = isRemoteUpdate;
@@ -160,33 +177,34 @@ public class BlankController implements Initializable {
         // to account for selecting text & typing over it
         if (!change.getRemoved().getText().isEmpty()) {
             int deleteCount = change.getRemoved().getText().length();
-            for (int i = 0; i < deleteCount; i++) {
-                if (idx >= visibleNodes.size()) {
-                    break;
-                }
+            // Snapshot BEFORE any deletions so indices stay stable
+            List<CharNode> snapshot = new ArrayList<>(visibleNodes);
 
-                String targetID = visibleNodes.get(idx).getCharID();
+            for (int i = 0; i < deleteCount; i++) {
+                int targetIdx = idx + i;
+                if (targetIdx >= snapshot.size()) break;
+
+                String targetID = snapshot.get(targetIdx).getCharID();
                 long thisClock = ++clock;
                 long now = System.currentTimeMillis();
-                String actType = "DELETE";
 
-                Action action = new Action(thisClock, now, mySiteID, docID, actType, targetID, null, null);
+                Action action = new Action(thisClock, now, mySiteID, docID,
+                        "DELETE", targetID, null, null);
                 blockDLL.applyAction(action);
                 seenActionIds.add(buildActionId(action));
                 wsService.sendAction(action);
-                refreshMapping();
+                // NO refreshMapping() here — snapshot keeps indices valid
             }
+            refreshMapping(); // once, after all deletes
         }
 
         // INSERT
         if (!change.getInserted().getText().isEmpty()) {
             ensureSeedHeadMapped();
             String rootID = getSeedHeadID();
-            if (rootID == null) {
-                return;
-            }
-            String text = change.getInserted().getText();
+            if (rootID == null) return;
 
+            String text = change.getInserted().getText();
             String parentID = resolveParentIDForInsert(idx, rootID);
 
             for (int i = 0; i < text.length(); i++) {
@@ -194,16 +212,39 @@ public class BlankController implements Initializable {
                 long thisClock = ++clock;
                 long now = System.currentTimeMillis();
 
+                // Build the node ONCE. Its charID is the source of truth.
                 CharNode newNode = new CharNode(mySiteID, thisClock, now, nextChar, parentID);
+                String newCharID = newNode.getCharID();
 
-                Action action = new Action(thisClock, now, mySiteID, docID, "INSERT", parentID, null, String.valueOf(nextChar));
-                blockDLL.applyAction(action);
+                // Action's startCharID = parentID (where to insert after)
+                Action action = new Action(thisClock, now, mySiteID, docID, "INSERT",
+                        parentID, null, String.valueOf(nextChar));
+
+                blockDLL.applyAction(action);             // CRDT inserts its own CharNode
                 seenActionIds.add(buildActionId(action));
                 wsService.sendAction(action);
-                parentID = newNode.getCharID();
+
+                // Chain: next char's parent is the char the CRDT just inserted.
+                // Look it up from the CRDT rather than using newNode (which was discarded).
+                parentID = resolveInsertedCharID(parentID, thisClock);
             }
             refreshMapping();
         }
+    }
+
+    // After applyAction inserts a char with (parentID, clock, siteID),
+    // find what charID the CRDT assigned to it.
+    private String resolveInsertedCharID(String parentCharID, long insertClock) {
+        // The CRDT inserts the new node directly after parentCharID in the CharDLL.
+        // Walk visibleNodes to find the node with matching siteID + clock.
+        refreshMapping();
+        for (CharNode node : visibleNodes) {
+            if (node.getSiteID() == mySiteID && node.getClock() == insertClock) {
+                return node.getCharID();
+            }
+        }
+        // Fallback: shouldn't happen, but don't crash.
+        return parentCharID;
     }
 
     // Recv change object which describes what the user just did - either insert, delete, or both
@@ -358,9 +399,19 @@ public class BlankController implements Initializable {
 
     // runs whenever another user edits
     public void handleRemoteAction(Action incomingAction) {
-        System.out.println("[REMOTE] type=" + incomingAction.getActionType()
-                + " site=" + incomingAction.getSiteID()
-                + " mysite=" + mySiteID);
+        String id = buildActionId(incomingAction);
+        boolean alreadySeen = seenActionIds.contains(id);
+        System.out.println("[REMOTE] id=" + id
+                + " type=" + incomingAction.getActionType()
+                + " fromMe=" + (incomingAction.getSiteID() == mySiteID)
+                + " blocked=" + alreadySeen);
+        System.out.println("[REMOTE RAW] siteID=" + incomingAction.getSiteID()
+                + " clock=" + incomingAction.getClock()
+                + " mySiteID=" + mySiteID
+                + " type=" + incomingAction.getActionType()
+                + " extra=" + incomingAction.getExtraData());
+
+
         // p1: GUARDS
         if (incomingAction == null) {
             return;
@@ -376,6 +427,26 @@ public class BlankController implements Initializable {
             return; // duplicate prevention
         }
 
+        if ("CURSOR".equals(incomingAction.getActionType())) {
+            int siteID = incomingAction.getSiteID();
+            if (siteID != mySiteID) {
+                remoteCursorPositions.put(siteID, incomingAction.getStartCharID());
+                String userName = incomingAction.getExtraData(); // "User-XXXX"
+                if (userName != null) {
+                    remoteUserNames.put(siteID, userName);
+                }
+
+                boolean previousRemoteFlag = isRemoteUpdate;
+                isRemoteUpdate = true;
+                try {
+                    updateActiveUsersPanel();
+                    applyStyles();
+                } finally {
+                    isRemoteUpdate = previousRemoteFlag;
+                }
+            }
+            return;
+        }
 
         // p2: APPLY
         seenActionIds.add(actionId);
