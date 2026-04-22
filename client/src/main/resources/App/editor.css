@@ -1,10 +1,14 @@
 .styled-text-area {
     -fx-background-color: #1e1e1e;
-    -fx-padding: 10;
+    -fx-padding: 16;
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 15px;
+    -fx-line-spacing: 6;
 }
 
 .styled-text-area .text {
     -fx-fill: #e6e6e6;
+    -fx-font-family: "Segoe UI", "System";
 }
 
 .styled-text-area .content {
@@ -12,22 +16,26 @@
 }
 
 .bold {
+    -fx-font-family: "Segoe UI", "System";
     -fx-font-weight: bold;
     -fx-fill: #d4d4d4;
 }
 
 .italic {
+    -fx-font-family: "Segoe UI", "System";
     -fx-font-style: italic;
     -fx-fill: #d4d4d4;
 }
 
 .bold-italic {
+    -fx-font-family: "Segoe UI", "System";
     -fx-font-weight: bold;
     -fx-font-style: italic;
     -fx-fill: #d4d4d4;
 }
 
 .regular {
+    -fx-font-family: "Segoe UI", "System";
     -fx-fill: #d4d4d4;
 }
 
@@ -60,7 +68,29 @@
 }
 
 .styled-text-area > .caret {
-    -fx-stroke: #3b82f6; /* swap in your color */
+    -fx-stroke: #3b82f6;
 }
 
+.btn-format {
+    -fx-background-color: #2a2a2a;
+    -fx-text-fill: #e6e6e6;
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-size: 13px;
+    -fx-background-radius: 6;
+    -fx-border-color: #444444;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 6;
+    -fx-padding: 4 14 4 14;
+    -fx-cursor: hand;
+}
 
+.btn-format:hover {
+    -fx-background-color: #333333;
+    -fx-border-color: #666666;
+}
+
+.btn-format:pressed {
+    -fx-background-color: #3d3d3d;
+    -fx-border-color: #888888;
+    -fx-text-fill: #ffffff;
+}

@@ -23,6 +23,7 @@
                     <Button fx:id="boldButton"
                             onAction="#toggleBold"
                             text="B"
+                            styleClass="btn-format"
                             style="-fx-background-color: #2a2a2a;
                             -fx-text-fill: white;
                             -fx-font-weight: bold;
@@ -30,6 +31,7 @@
                     <Button fx:id="italicButton"
                             onAction="#toggleItalic"
                             text="I"
+                            styleClass="btn-format"
                             style="-fx-background-color: #2a2a2a; -fx-text-fill: white; -fx-font-style: italic; -fx-cursor: hand;"/>
                 </HBox>
 
