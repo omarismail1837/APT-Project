@@ -21,7 +21,7 @@ public class ChatController {
     @SendTo("/topic/updates")
     public Action sendUpdate(Action update) {
         System.out.println("Received update: " + update);
-        if (!allActions.contains(update)) allActions.add(update);
+        if (!allActions.contains(update) && !update.getActionType().equals("CURSOR")) allActions.add(update);
         return update;
     }
 
