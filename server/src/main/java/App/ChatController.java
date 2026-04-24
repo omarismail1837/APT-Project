@@ -14,6 +14,8 @@ public class ChatController {
 
     private final HashMap<String, List<Action>> activeDocuments = new HashMap<>();
 
+    private List<Action> allActions = new ArrayList<>();
+
     public ChatController() {allActions = new ArrayList<>();}
 
     @MessageMapping("/send-data")
