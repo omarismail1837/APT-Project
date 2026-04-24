@@ -30,7 +30,7 @@ public class Action {
         this.endCharID = endCharID;
         this.extraData = extraData; //holds JSON if pasting, character if inserting, true/false if italic/bold
         this.colorIndex = -1;
-        this.id = getActionId();
+        this.id = documentId + ":" + siteID + ":" + clock;
     }
     public Action() {} //required for JSON
     //getters
