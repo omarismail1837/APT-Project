@@ -29,7 +29,7 @@ public class ChatController {
     public List<Action> initialState(@DestinationVariable String docId) {
         System.out.println("User subscribed to " + docId + ". Sending full history...");
 
-        List<Action> history = actionRepository.findByDocId(docId);
+        List<Action> history = actionRepository.findByDocumentId(docId);
 
         return history;
     }
