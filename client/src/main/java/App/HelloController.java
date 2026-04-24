@@ -6,7 +6,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.stage.Stage;
+import javafx.scene.control.TextField;import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.net.URL;
@@ -24,6 +24,12 @@ public class HelloController {
 
     @FXML
     private Button newDocButton;
+
+    @FXML
+    private Button joinButton;
+
+    @FXML
+    private TextField sessionCodeField;
 
     @FXML
     // doesnt open new window; replaces the current scene with a new one loaded from new-doc.fxml
@@ -44,6 +50,54 @@ public class HelloController {
             System.out.println("CSS found: " + cssUrl);
             scene.getStylesheets().add(cssUrl.toExternalForm());
         }
+        stage.setScene(scene);
+        stage.show();
+    }
+
+    @FXML
+    private void joinSession() throws IOException {
+        // Use the specific ID logic you already have
+        String sessionID = sessionCodeField.getText();
+        loadEditorScene(sessionID, joinButton);
+    }
+
+    /**
+     * Helper method to prevent code duplication and fix the double-scene bug.
+     */
+    private void loadEditorScene(String docID, Button sourceButton) throws IOException {
+        URL fxmlUrl = resolveFxml("/App/new-doc.fxml");
+        if (fxmlUrl == null) {
+            throw new IllegalStateException("Cannot find FXML: /App/new-doc.fxml");
+        }
+
+        FXMLLoader loader = HelloApplication.createLoader(fxmlUrl);
+
+        // 1. Setup the Factory to pass data to BlankController
+        loader.setControllerFactory(type -> {
+            if (type == BlankController.class) {
+                return new BlankController(docID, this.blockDLL);
+            }
+            try {
+                return type.getDeclaredConstructor().newInstance();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create controller", e);
+            }
+        });
+
+        // 2. Load the root only ONCE
+        Parent root = loader.load();
+        Scene scene = new Scene(root);
+
+        // 3. Apply CSS to THIS specific scene instance
+        URL cssUrl = HelloApplication.class.getResource("/App/editor.css");
+        if (cssUrl != null) {
+            scene.getStylesheets().add(cssUrl.toExternalForm());
+        } else {
+            System.err.println("WARNING: editor.css not found at /App/editor.css");
+        }
+
+        // 4. Update the Stage
+        Stage stage = (Stage) sourceButton.getScene().getWindow();
         stage.setScene(scene);
         stage.show();
     }

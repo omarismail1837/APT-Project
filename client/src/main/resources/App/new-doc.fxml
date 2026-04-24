@@ -17,6 +17,8 @@
             <HBox alignment="CENTER_LEFT" spacing="15" style="-fx-padding: 15; -fx-border-color: transparent transparent #333 transparent; -fx-border-width: 1;">
                 <Label text="my-document.txt" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 14;"/>
 
+                <Label fx:id="docIdLabel" style="-fx-text-fill: #888; -fx-font-family: 'monospace'; -fx-font-size: 12;" />
+
                 <Separator orientation="VERTICAL" prefHeight="20" style="-fx-opacity: 0.2;"/>
 
                 <HBox spacing="5">

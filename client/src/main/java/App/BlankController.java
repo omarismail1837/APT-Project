@@ -24,8 +24,16 @@ public class BlankController implements Initializable {
 
     private final int mySiteID = Math.abs(UUID.randomUUID().hashCode());
     private long clock = 0;
-    // everyone is connected to the same document (for now)
-    private final String docID = "test2";
+
+    //Document ID
+    private String docID;
+    @FXML private Label docIdLabel; // Must match fx:id in FXML
+    public void setDocID(String docID) {
+        this.docID = docID;
+        System.out.println("DocID: " + docID);
+    }
+    public String getDocID() {return docID;}
+
     private WebSocketService wsService;
 
     private final BlockDLL blockDLL;
@@ -57,7 +65,13 @@ public class BlankController implements Initializable {
     @FXML private Label lineColLabel;
     @FXML private Label connectedLabel;
 
+    public BlankController(String docID, BlockDLL blockDLL) {
+        this.docID = docID;
+        this.blockDLL = blockDLL;
+    }
+
     public BlankController(BlockDLL blockDLL) {
+        this.docID = String.valueOf(Math.abs(blockDLL.hashCode()));
         this.blockDLL = (blockDLL != null) ? blockDLL : new BlockDLL();
     }
 
@@ -107,6 +121,10 @@ public class BlankController implements Initializable {
             broadcastCursorPosition(textArea.getCaretPosition());
         });
         textArea.setStyle("-fx-caret-color: " + colorForSite(mySiteID) + ";");
+
+        if (docIdLabel != null) {
+            docIdLabel.setText("ID: " + docID);
+        }
     }
 
     private void broadcastCursorPosition(int caretPos) {

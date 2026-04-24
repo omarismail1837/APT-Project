@@ -47,7 +47,9 @@
                                promptText="Session code"
                                styleClass="join-input"
                                HBox.hgrow="ALWAYS"/>
-                    <Button text="Join session"
+                    <Button fx:id="joinButton"
+                            text="Join session"
+                            onAction="#joinSession"
                             styleClass="btn-secondary"
                             minWidth="110"/>
                 </HBox>
