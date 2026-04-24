@@ -5,15 +5,14 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.stereotype.Controller;
-
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 @Controller
 public class ChatController {
 
-    // @Autowired
-    private final List<Action> allActions;
+    private final HashMap<String, List<Action>> activeDocuments = new HashMap<>();
 
     public ChatController() {allActions = new ArrayList<>();}
 
