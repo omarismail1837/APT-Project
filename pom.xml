@@ -16,8 +16,6 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>shared</module>
-        <module>server</module>
         <module>client</module>
     </modules>
 
