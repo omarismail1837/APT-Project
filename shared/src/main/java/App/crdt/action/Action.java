@@ -7,18 +7,18 @@ public class Action {
     long clock; //used to identify unique actions along with siteID
     long time;
     int siteID;
-    String documentID;
+    String documentId;
     String actionType;
     String startCharID;
     String endCharID;
     String extraData;
     int colorIndex = -1;
 
-    public Action(long clock, long time, int SiteID, String documentID, String actionType, String startCharID, String endCharID, String extraData) {
+    public Action(long clock, long time, int SiteID, String documentId, String actionType, String startCharID, String endCharID, String extraData) {
         this.clock = clock;
         this.siteID = SiteID;
         this.time = time;
-        this.documentID = documentID;
+        this.documentId = documentId;
         this.actionType = actionType;
         this.startCharID = startCharID;
         this.endCharID = endCharID;
@@ -30,7 +30,7 @@ public class Action {
     public long getClock() {return clock;}
     public long getTime() {return time;}
     public int getSiteID() {return siteID;}
-    public String getDocumentID() {return documentID;}
+    public String getDocumentID() {return documentId;}
     public String getActionType() {return actionType;}
     public String getStartCharID() {return startCharID;}
     public String getEndCharID() {return endCharID;}
@@ -41,7 +41,7 @@ public class Action {
     public void setClock(long clock) {this.clock = clock;}
     public void setTime(long time) {this.time = time;}
     public void setSiteID(int siteID) {this.siteID = siteID;}
-    public void setDocumentID(String documentID) {this.documentID = documentID;}
+    public void setDocumentID(String documentId) {this.documentId = documentId;}
     public void setActionType(String actionType) {this.actionType = actionType;}
     public void setStartCharID(String startCharID) {this.startCharID = startCharID;}
     public void setEndCharID(String endCharID) {this.endCharID = endCharID;}
@@ -49,7 +49,7 @@ public class Action {
     public void setColorIndex(int colorIndex) {this.colorIndex = colorIndex;}
 
     public String getActionId() {
-        return documentID + ":" + siteID + ":" + clock;
+        return documentId + ":" + siteID + ":" + clock;
     }
 
     @Override
@@ -58,12 +58,12 @@ public class Action {
         if (!(obj instanceof Action other)) return false;
         return clock == other.clock
                 && siteID == other.siteID
-                && Objects.equals(documentID, other.documentID);
+                && Objects.equals(documentId, other.documentId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(clock, siteID, documentID);
+        return Objects.hash(clock, siteID, documentId);
     }
 
     @Override

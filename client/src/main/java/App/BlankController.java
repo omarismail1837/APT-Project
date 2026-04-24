@@ -87,7 +87,7 @@ public class BlankController implements Initializable {
         // Platform.runLater() schedules the update to run on the main thread safely
         // accept is a function that runs everytime a webscoket msg arrives
         // anonymous class that implements Consumer<Action> on the spot
-        wsService = new WebSocketService(new Consumer<Action>() {
+        wsService = new WebSocketService(docID, new Consumer<Action>() {
             @Override
             public void accept(final Action action) {
                 System.out.println("[CLIENT CALLBACK] received action from websocket=" + action);

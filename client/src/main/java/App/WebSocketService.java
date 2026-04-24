@@ -19,25 +19,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-// comm layer between client & server
 public class WebSocketService {
 
-    // the active websocket connection
-    // volatile = multiple threads can safely read it
-    // StompSession is the object used to send messages
     private volatile StompSession session;
+    private final String documentId;
     private final Consumer<Action> onActionReceived;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // actions sent before the connection is established go here
     private final Queue<Action> pendingActions = new ConcurrentLinkedQueue<>();
-
-    // replay past edits first and THEN live actions
     private final Queue<Action> bufferedLiveUpdates = new ConcurrentLinkedQueue<>();
     private final AtomicInteger replayState = new AtomicInteger(0); // 0=none, 1=replaying, 2=ready
     private final Runnable onConnected;
 
-    public WebSocketService(Consumer<Action> onActionReceived, Runnable onConnected) {
+    public WebSocketService(String documentId, Consumer<Action> onActionReceived, Runnable onConnected) {
+        this.documentId = documentId;
         this.onActionReceived = onActionReceived;
         this.onConnected = onConnected;
     }
@@ -45,7 +40,6 @@ public class WebSocketService {
     public void connect(String url) {
         String nativeUrl = normalizeWebSocketUrl(url);
         String sockJsUrl = normalizeHttpUrl(url);
-        // a sys property flag to choose connection strategy. by def it uses SockJS
         boolean nativeFirst = Boolean.parseBoolean(System.getProperty("ws.nativeFirst", "false"));
 
         if (!nativeFirst) {
@@ -54,38 +48,22 @@ public class WebSocketService {
         }
 
         AtomicBoolean fallbackStarted = new AtomicBoolean(false);
-
-        System.out.println("[WS] Connecting to " + nativeUrl + " (native)");
-
         WebSocketStompClient nativeClient = new WebSocketStompClient(new StandardWebSocketClient());
         nativeClient.setMessageConverter(new MappingJackson2MessageConverter());
 
         CompletableFuture<StompSession> future = nativeClient.connectAsync(nativeUrl, buildSessionHandler("native"));
         future.whenComplete((connectedSession, throwable) -> {
-            if (throwable == null) {
-                return;
-            }
-
-            System.err.println("[WS] Native connect failed: " + throwable.getMessage());
-            if (fallbackStarted.compareAndSet(false, true)) {
+            if (throwable != null && fallbackStarted.compareAndSet(false, true)) {
                 connectWithSockJs(sockJsUrl);
             }
         });
     }
 
     private void connectWithSockJs(String url) {
-        System.out.println("[WS] Connecting to " + url + " (sockjs fallback)");
-
         SockJsClient sockJsClient = new SockJsClient(List.of(new WebSocketTransport(new StandardWebSocketClient())));
         WebSocketStompClient stompClient = new WebSocketStompClient(sockJsClient);
         stompClient.setMessageConverter(new MappingJackson2MessageConverter());
-
-        CompletableFuture<StompSession> future = stompClient.connectAsync(url, buildSessionHandler("sockjs"));
-        future.whenComplete((connectedSession, throwable) -> {
-            if (throwable != null) {
-                System.err.println("[WS] SockJS connect failed: " + throwable.getMessage());
-            }
-        });
+        stompClient.connectAsync(url, buildSessionHandler("sockjs"));
     }
 
     private StompSessionHandler buildSessionHandler(String transportName) {
@@ -93,87 +71,80 @@ public class WebSocketService {
             @Override
             public void afterConnected(StompSession s, StompHeaders headers) {
                 session = s;
-                System.out.println("[WS] Connected via " + transportName + ". Session=" + s.getSessionId());
+                System.out.println("[WS] Connected to Doc: " + documentId + " via " + transportName);
                 subscribeToTopics();
                 flushPendingActions();
-                if (onConnected != null) {
-                    onConnected.run();
-                }
+                if (onConnected != null) onConnected.run();
             }
 
             @Override
             public void handleTransportError(StompSession s, Throwable ex) {
-                System.err.println("[WS] " + transportName + " transport error: " + ex.getMessage());
+                System.err.println("[WS] Transport error: " + ex.getMessage());
             }
         };
     }
 
     private void subscribeToTopics() {
-        if (session == null) {
-            return;
-        }
+        if (session == null) return;
 
+        // 1. Enter Replay Mode
         replayState.set(1);
 
-        // live updates channel
-        session.subscribe("/topic/updates", new StompFrameHandler() {
+        // 2. Subscribe to LIVE UPDATES (/topic)
+        session.subscribe("/topic/docs/" + documentId + "/updates", new StompFrameHandler() {
             @Override
-            public Type getPayloadType(StompHeaders headers) {
-                return Action.class;
-            }
+            public Type getPayloadType(StompHeaders headers) { return Action.class; }
 
             @Override
             public void handleFrame(StompHeaders headers, Object payload) {
                 Action action = convertToAction(payload);
-                if (action == null) {
-                    return;
-                }
+                if (action == null) return;
 
+                // Buffer updates if we are still loading history
                 if (replayState.get() == 1) {
                     bufferedLiveUpdates.offer(action);
-                    return;
+                } else {
+                    onActionReceived.accept(action);
                 }
-
-                onActionReceived.accept(action);
             }
         });
 
-        // request doc history from server
-        session.subscribe("/app/initial-state", new StompFrameHandler() {
+        // 3. Subscribe to INITIAL STATE (/app triggers @SubscribeMapping)
+        session.subscribe("/app/docs/" + documentId + "/initial-state", new StompFrameHandler() {
             @Override
-            public Type getPayloadType(StompHeaders headers) {
-                return List.class;
-            }
+            public Type getPayloadType(StompHeaders headers) { return List.class; }
 
             @Override
             public void handleFrame(StompHeaders headers, Object payload) {
-                if (!(payload instanceof List<?> payloadList)) {
-                    replayState.set(2);
-                    drainBufferedLiveUpdates();
-                    return;
-                }
-
-                for (Object item : payloadList) {
-                    Action action = convertToAction(item);
-                    if (action != null) {
-                        onActionReceived.accept(action);
+                if (payload instanceof List<?> payloadList) {
+                    System.out.println("[WS] Received history: " + payloadList.size() + " actions");
+                    for (Object item : payloadList) {
+                        Action action = convertToAction(item);
+                        if (action != null) onActionReceived.accept(action);
                     }
                 }
 
+                // 4. History loaded. Flush the live buffer.
                 replayState.set(2);
                 drainBufferedLiveUpdates();
             }
         });
     }
 
-    private Action convertToAction(Object payload) {
-        if (payload instanceof Action) {
-            return (Action) payload;
+    public void sendAction(Action action) {
+        if (action == null) return;
+        StompSession current = session;
+
+        // DEBUG LOG
+        String destination = "/app/docs/" + documentId + "/send-data";
+        System.out.println("[WS DEBUG] Attempting to send to: " + destination);
+
+        if (current != null && current.isConnected()) {
+            current.send(destination, action);
+        } else {
+            System.out.println("[WS DEBUG] Send failed: Session is null or disconnected.");
+            pendingActions.offer(action);
         }
-        if (payload instanceof Map<?, ?>) {
-            return objectMapper.convertValue(payload, Action.class);
-        }
-        return null;
     }
 
     private void drainBufferedLiveUpdates() {
@@ -183,64 +154,28 @@ public class WebSocketService {
         }
     }
 
-    // if connected, send immediately
-    // if not, queue it for later
-    public void sendAction(Action action) {
-        if (action == null) {
-            return;
-        }
-
-        StompSession current = session;
-        if (current != null && current.isConnected()) {
-            current.send("/app/send-data", action);
-            return;
-        }
-
-        pendingActions.offer(action);
-        System.out.println("[WS SEND] Session not ready. Queued action. Pending=" + pendingActions.size());
-    }
-
     private void flushPendingActions() {
         StompSession current = session;
-        if (current == null || !current.isConnected()) {
-            return;
-        }
-
-        int flushed = 0;
+        if (current == null || !current.isConnected()) return;
         Action next;
         while ((next = pendingActions.poll()) != null) {
-            current.send("/app/send-data", next);
-            flushed++;
+            current.send("/app/docs/" + documentId + "/send-data", next);
         }
+    }
 
-        if (flushed > 0) {
-            System.out.println("[WS SEND] Flushed queued actions=" + flushed);
-        }
+    private Action convertToAction(Object payload) {
+        if (payload instanceof Action) return (Action) payload;
+        if (payload instanceof Map) return objectMapper.convertValue(payload, Action.class);
+        return null;
     }
 
     private String normalizeWebSocketUrl(String url) {
-        if (url == null || url.isBlank()) {
-            return "ws://localhost:8080/ws-connect";
-        }
-        if (url.startsWith("https://")) {
-            return "wss://" + url.substring("https://".length());
-        }
-        if (url.startsWith("http://")) {
-            return "ws://" + url.substring("http://".length());
-        }
-        return url;
+        if (url == null || url.isBlank()) return "ws://localhost:8080/ws-connect";
+        return url.replace("https://", "wss://").replace("http://", "ws://");
     }
 
     private String normalizeHttpUrl(String url) {
-        if (url == null || url.isBlank()) {
-            return "http://localhost:8080/ws-connect";
-        }
-        if (url.startsWith("wss://")) {
-            return "https://" + url.substring("wss://".length());
-        }
-        if (url.startsWith("ws://")) {
-            return "http://" + url.substring("ws://".length());
-        }
-        return url;
+        if (url == null || url.isBlank()) return "http://localhost:8080/ws-connect";
+        return url.replace("wss://", "https://").replace("ws://", "http://");
     }
 }
