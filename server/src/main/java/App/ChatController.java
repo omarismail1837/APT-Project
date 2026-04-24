@@ -21,6 +21,7 @@ public class ChatController {
 
     @MessageMapping("/docs/{documentId}/send-data")
     public void sendUpdate(@DestinationVariable String documentId, Action update) {
+        System.out.println("Recieved action: " + documentId);
         actionRepository.save(update); // save - automatically converted to json
         messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", update); //broadcast
     }
