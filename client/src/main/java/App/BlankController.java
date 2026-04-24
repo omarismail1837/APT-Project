@@ -25,7 +25,7 @@ public class BlankController implements Initializable {
     private final int mySiteID = Math.abs(UUID.randomUUID().hashCode());
     private long clock = 0;
     // everyone is connected to the same document (for now)
-    private final String docID = "testing";
+    private final String docID = "test2";
     private WebSocketService wsService;
 
     private final BlockDLL blockDLL;
