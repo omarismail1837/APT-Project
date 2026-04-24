@@ -32,6 +32,8 @@ public class ChatController {
 
         List<Action> history = actionRepository.findByDocumentId(docId);
 
+        System.out.println("Sending " + history.size() + " actions");
+
         return history;
     }
 }
