@@ -68,7 +68,7 @@ public class Action {
     @Override
     public String toString() {
         return "Action{" +
-                "id='" + getActionId() + '\'' +
+                "id='" + getId() + '\'' +
                 ", type='" + actionType + '\'' +
                 ", start='" + startCharID + '\'' +
                 ", end='" + endCharID + '\'' +
