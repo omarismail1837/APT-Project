@@ -19,10 +19,10 @@ public class ChatController {
         this.actionRepository = actionRepository;
     }
 
-    @MessageMapping("/docs/{docId}/send-data")
-    public void sendUpdate(@DestinationVariable String docId, Action update) {
+    @MessageMapping("/docs/{documentId}/send-data")
+    public void sendUpdate(@DestinationVariable String documentId, Action update) {
         actionRepository.save(update); // save - automatically converted to json
-        messagingTemplate.convertAndSend("/topic/docs/" + docId + "/updates", update); //broadcast
+        messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", update); //broadcast
     }
 
     @SubscribeMapping("/docs/{docId}/initial-state")

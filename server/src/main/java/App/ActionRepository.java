@@ -8,5 +8,5 @@ import java.util.List;
 @Repository
 public interface ActionRepository extends MongoRepository<Action, String> {
     // Spring automatically writes the query to find actions by docId
-    List<Action> findByDocId(String documentId);
+    List<Action> findByDocumentId(String documentId);
 }
