@@ -56,10 +56,6 @@ public class Action {
     public void setExtraData(String extraData) {this.extraData = extraData;}
     public void setColorIndex(int colorIndex) {this.colorIndex = colorIndex;}
 
-    public String getActionId() {
-        return documentId + ":" + siteID + ":" + clock;
-    }
-
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
@@ -77,7 +73,7 @@ public class Action {
     @Override
     public String toString() {
         return "Action{" +
-                "id='" + getActionId() + '\'' +
+                "id='" + getId() + '\'' +
                 ", type='" + actionType + '\'' +
                 ", start='" + startCharID + '\'' +
                 ", end='" + endCharID + '\'' +
