@@ -8,14 +8,13 @@ import App.crdt.character.CharNode;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Pos;import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;import javafx.scene.layout.HBox;import javafx.scene.layout.VBox;import javafx.scene.paint.Color;import javafx.scene.shape.Circle;import org.fxmisc.richtext.StyleClassedTextArea;import org.fxmisc.richtext.model.RichTextChange;
+import javafx.scene.layout.HBox;import javafx.scene.layout.VBox;import javafx.scene.paint.Color;import javafx.scene.shape.Circle;import org.fxmisc.richtext.StyleClassedTextArea;import org.fxmisc.richtext.model.RichTextChange;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 
 // Responsible for:
 // listening to what user types & translating the keystrokes to CRDT OPs
@@ -26,7 +25,7 @@ public class BlankController implements Initializable {
     private final int mySiteID = Math.abs(UUID.randomUUID().hashCode());
     private long clock = 0;
     // everyone is connected to the same document (for now)
-    private final String docID = "doc-123";
+    private final String docID = "testing";
     private WebSocketService wsService;
 
     private final BlockDLL blockDLL;
@@ -428,7 +427,7 @@ public class BlankController implements Initializable {
         }
 
         // always passes for now since the id is hardcoded
-        if (docID.equals(incomingAction.getDocumentID()) == false) {
+        if (docID.equals(incomingAction.getDocumentId()) == false) {
             return; // only process actions for OUR document
         }
 
@@ -590,7 +589,7 @@ public class BlankController implements Initializable {
         if (action == null) {
             return "null";
         }
-        return action.getDocumentID() + ":" + action.getSiteID() + ":" + action.getClock();
+        return action.getDocumentId() + ":" + action.getSiteID() + ":" + action.getClock();
     }
 
     @FXML

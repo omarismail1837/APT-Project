@@ -420,7 +420,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (action == null) {
             return "null";
         }
-        return action.getDocumentID() + ":" + action.getSiteID() + ":" + action.getClock();
+        return action.getDocumentId() + ":" + action.getSiteID() + ":" + action.getClock();
     }
 
     public BlockNode getHead() {

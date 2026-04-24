@@ -7,6 +7,7 @@ public class Action {
     long clock; //used to identify unique actions along with siteID
     long time;
     int siteID;
+    private String id;
     String documentId;
     String actionType;
     String startCharID;
@@ -24,24 +25,26 @@ public class Action {
         this.endCharID = endCharID;
         this.extraData = extraData; //holds JSON if pasting, character if inserting, true/false if italic/bold
         this.colorIndex = -1;
+        this.id = getActionId();
     }
     public Action() {} //required for JSON
     //getters
     public long getClock() {return clock;}
     public long getTime() {return time;}
     public int getSiteID() {return siteID;}
-    public String getDocumentID() {return documentId;}
+    public String getDocumentId() {return documentId;}
     public String getActionType() {return actionType;}
     public String getStartCharID() {return startCharID;}
     public String getEndCharID() {return endCharID;}
     public String getExtraData() {return extraData;}
     public int getColorIndex() {return colorIndex;}
+    public String getId() {return id;}
 
     //setters
     public void setClock(long clock) {this.clock = clock;}
     public void setTime(long time) {this.time = time;}
     public void setSiteID(int siteID) {this.siteID = siteID;}
-    public void setDocumentID(String documentId) {this.documentId = documentId;}
+    public void setDocumentId(String documentId) {this.documentId = documentId;}
     public void setActionType(String actionType) {this.actionType = actionType;}
     public void setStartCharID(String startCharID) {this.startCharID = startCharID;}
     public void setEndCharID(String endCharID) {this.endCharID = endCharID;}

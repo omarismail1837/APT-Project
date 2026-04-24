@@ -49,11 +49,11 @@ public class ChatController {
         if (update == null) {
             return null;
         }
-        if (update.getDocumentID() == null || update.getDocumentID().isBlank()) {
+        if (update.getDocumentId() == null || update.getDocumentId().isBlank()) {
             return null;
         }
 
-        update.setColorIndex(assignColorIndex(update.getDocumentID(), update.getSiteID()));
+        update.setColorIndex(assignColorIndex(update.getDocumentId(), update.getSiteID()));
 
         String type = update.getActionType();
         if (type != null && !type.equals("CURSOR")) {
