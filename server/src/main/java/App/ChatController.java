@@ -8,6 +8,7 @@ import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -61,9 +62,7 @@ public class ChatController {
 
     // Endpoint to join a session (returns role) -- now requires documentId
     @GetMapping("/docs/{documentId}/join-session")
-    public String joinSession(@PathVariable String documentId, Action action) {
-        String code = String.valueOf(action.getExtraData()); // client sends code in extraData
-        String userId = action.getExtraData();
+    public String joinSession(@PathVariable String documentId, @RequestParam String code, @RequestParam String userId) {
         SessionInfo info = sessions.get(documentId);
         if (info == null) return "invalid";
         String role = null;
@@ -79,7 +78,7 @@ public class ChatController {
         // Broadcast cursor add for this user
         Action cursorAction = new Action();
         cursorAction.setActionType("CURSOR");
-        cursorAction.setSiteID(action.getSiteID());
+        cursorAction.setSiteID(userId);
         cursorAction.setDocumentId(documentId);
         info.cursors.put(userId, cursorAction);
         messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", cursorAction);
