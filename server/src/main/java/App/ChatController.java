@@ -96,13 +96,17 @@ public class ChatController {
         SessionInfo info = sessions.get(documentId);
         boolean canEdit = info != null && info.editors.contains(userId);
         System.out.println("Recieved action: " + documentId + ", userId=" + userId + ", canEdit=" + canEdit);
+
+        if (update.getActionType().equals("DISCONNECT")) {
+            info.cursors.remove(userId);
+        }
         if (update.getActionType().equals("CURSOR") && info != null && userId != null) {
             info.cursors.put(userId, update);
         }
         if (canEdit && !update.getActionType().equals("CURSOR")) {
             actionRepository.save(update);
         }
-        if (canEdit || update.getActionType().equals("CURSOR")) {
+        if (canEdit || update.getActionType().equals("CURSOR") || update.getActionType().equals("DISCONNECT")) {
             messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", update);
         }
     }
