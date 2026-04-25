@@ -7,8 +7,17 @@ import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.geometry.Pos;import javafx.scene.control.*;
-import javafx.scene.layout.HBox;import javafx.scene.layout.VBox;import javafx.scene.paint.Color;import javafx.scene.shape.Circle;import org.fxmisc.richtext.StyleClassedTextArea;import org.fxmisc.richtext.model.RichTextChange;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.IndexRange;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextFormatter;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import org.fxmisc.richtext.StyleClassedTextArea;
+import org.fxmisc.richtext.model.RichTextChange;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -22,7 +31,21 @@ import java.util.function.Consumer;
 // recv ops from other users via websocket & apply to doc
 public class BlankController implements Initializable {
 
-    private final int mySiteID = Math.abs(UUID.randomUUID().hashCode());
+    public BlankController(String docID, String viewCode, String editCode, int mySiteID, BlockDLL blockDLL, boolean canEdit) {
+        this.docID = docID;
+        this.editCode = editCode;
+        this.viewCode = viewCode;
+        this.mySiteID = mySiteID;
+        this.blockDLL = blockDLL;
+        this.canEdit = canEdit;
+    }
+
+    public BlankController(BlockDLL blockDLL) {
+        // Chains to the main constructor with placeholder values
+        this("local-doc", "N/A", null, 0, blockDLL, true);
+    }
+
+    private final int mySiteID;
     private long clock = 0;
 
     //Document ID
@@ -64,20 +87,11 @@ public class BlankController implements Initializable {
     private Button italicButton;
     @FXML private Label lineColLabel;
     @FXML private Label connectedLabel;
+    @FXML private Label sessionCodeLabel; // Add this for displaying the code
+    private boolean canEdit = true;
+    private String editCode; // Store the code
+    private String viewCode; // Store the view code if available
 
-    public BlankController(String docID, BlockDLL blockDLL) {
-        this.docID = docID;
-        this.blockDLL = blockDLL;
-    }
-
-    public BlankController(BlockDLL blockDLL) {
-        this.docID = String.valueOf(Math.abs(blockDLL.hashCode()));
-        this.blockDLL = (blockDLL != null) ? blockDLL : new BlockDLL();
-    }
-
-    public BlankController() {
-        this(new BlockDLL());
-    }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -124,6 +138,19 @@ public class BlankController implements Initializable {
 
         if (docIdLabel != null) {
             docIdLabel.setText("ID: " + docID);
+        }
+        if (sessionCodeLabel != null) {
+            if (canEdit && viewCode != null && !viewCode.isEmpty()) {
+                sessionCodeLabel.setText("Edit Code: " + editCode + "  |  View Code: " + viewCode);
+            } else if (canEdit) {
+                sessionCodeLabel.setText("Edit Code: " + editCode + "  |  View Code: (not available)");
+            } else {
+                sessionCodeLabel.setText("View Code: " + viewCode);
+            }
+        }
+        // Enable/disable editing
+        if (textArea != null) {
+            textArea.setEditable(canEdit);
         }
     }
 
