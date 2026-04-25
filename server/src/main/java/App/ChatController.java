@@ -12,23 +12,27 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @Controller
 public class ChatController {
     private final SimpMessagingTemplate messagingTemplate;
-    private final ActionRepository actionRepository; // Use the repository instead
+    private final ActionRepository actionRepository;
+    private final DocRepository docRepository;
     private final Faker faker = new Faker();
+    //needed to close session after 5 minutes of being empty
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     // Session info: docId -> SessionInfo
     private final Map<String, SessionInfo> sessions = new HashMap<>();
 
-    public ChatController(SimpMessagingTemplate messagingTemplate, ActionRepository actionRepository) {
+    public ChatController(SimpMessagingTemplate messagingTemplate, ActionRepository actionRepository, DocRepository docRepository) {
         this.messagingTemplate = messagingTemplate;
         this.actionRepository = actionRepository;
+        this.docRepository = docRepository;
     }
 
     // SessionInfo holds codes and lists of editors/viewers
@@ -51,23 +55,61 @@ public class ChatController {
         );
     }
 
-    // Generate codes for a document session
-    private SessionInfo getOrCreateSession(String docId) {
-        return sessions.computeIfAbsent(docId, id -> {
-            SessionInfo info = new SessionInfo();
-            info.editCode = generateReadableCode();
-            info.viewCode = generateReadableCode();
-            return info;
+    // Generate codes for a document session - creates document if doesnt exist
+    private SessionInfo getOrCreateSession(String docId, String name, String ownerId) {
+        // Check active sessions first
+        if (sessions.containsKey(docId)) {
+            return sessions.get(docId);
+        }
+
+        // check if docid already exists
+        // We fetch the metadata to ensure the doc exists, but we generate FRESH codes.
+        DocMetadata metadata = docRepository.findById(docId).orElseGet(() -> {
+            // create if not in db
+            DocMetadata newDoc = new DocMetadata();
+            newDoc.setDocId(docId);
+            newDoc.setName(name);
+            newDoc.setOwnerId(ownerId);
+            return newDoc;
         });
+
+        // generate new codes (they change everytime session restarts)
+        String newEditCode = generateReadableCode();
+        String newViewCode = generateReadableCode();
+
+        // update database with codes
+        metadata.setEditCode(newEditCode);
+        metadata.setViewCode(newViewCode);
+        docRepository.save(metadata);
+
+        // create sessioninfo object
+        SessionInfo info = new SessionInfo();
+        info.editCode = newEditCode;
+        info.viewCode = newViewCode;
+
+        // save the session into memory
+        sessions.put(docId, info);
+
+        return info;
     }
 
     // Endpoint to get codes for a document
     @GetMapping("docs/{documentId}/get-codes")
-    public Map<String, String> getCodes(@PathVariable String documentId) {
-        SessionInfo info = getOrCreateSession(documentId);
+    public Map<String, String> getCodes(
+            @PathVariable String documentId,
+            @RequestParam String userId,
+            @RequestParam(required = false) String name
+    ) {
+        String finalName = (name == null || name.isBlank()) ? "Untitled Document" : name;
+
+        //finds existing doc or creates new one
+        SessionInfo info = getOrCreateSession(documentId, finalName, userId);
+
+        //return codes
         Map<String, String> codes = new HashMap<>();
         codes.put("editCode", info.editCode);
         codes.put("viewCode", info.viewCode);
+
         return codes;
     }
 
@@ -100,8 +142,11 @@ public class ChatController {
         if (update.getActionType().equals("DISCONNECT")) {
             info.cursors.remove(userId);
         }
-        if (update.getActionType().equals("CURSOR") && info != null && userId != null) {
+        else if (update.getActionType().equals("CURSOR") && info != null && userId != null) {
             info.cursors.put(userId, update);
+        }
+        else { //update last updated
+            docRepository.updateLastModified(documentId,new Date());
         }
         if (canEdit && !update.getActionType().equals("CURSOR")) {
             actionRepository.save(update);
@@ -151,5 +196,16 @@ public class ChatController {
             sessions.remove(documentId);
         }
         return removed ? "left" : "not_found";
+    }
+
+    private void scheduleSessionCleanup(String docId) {
+        scheduler.schedule(() -> {
+            SessionInfo info = sessions.get(docId);
+            // Only remove if the session is still empty after 5 minutes
+            if (info != null && info.editors.isEmpty() && info.viewers.isEmpty()) {
+                sessions.remove(docId);
+                System.out.println("Session " + docId + " expired. Next join will generate new codes.");
+            }
+        }, 5, TimeUnit.MINUTES);
     }
 }
