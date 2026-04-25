@@ -60,29 +60,18 @@ public class ChatController {
         return codes;
     }
 
-    // Endpoint to join a session (returns role) -- now requires documentId
-    @GetMapping("/docs/{documentId}/join-session")
-    public String joinSession(@PathVariable String documentId, @RequestParam String code, @RequestParam String userId) {
-        SessionInfo info = sessions.get(documentId);
-        if (info == null) return "invalid";
-        String role = null;
-        if (info.editCode.equals(code)) {
-            if (!info.editors.contains(userId)) info.editors.add(userId);
-            role = "editor";
-        } else if (info.viewCode.equals(code)) {
-            if (!info.viewers.contains(userId)) info.viewers.add(userId);
-            role = "viewer";
-        } else {
-            return "invalid";
+    @GetMapping("/join")
+    public String join(@RequestParam String code, @RequestParam String userId) {
+        for (SessionInfo info : sessions.values()) {
+            if (code.equals(info.editCode)) {
+                info.editors.add(userId);
+                return "editor";
+            } else if (code.equals(info.viewCode)) {
+                info.viewers.add(userId);
+                return "viewer";
+            }
         }
-        // Broadcast cursor add for this user
-        Action cursorAction = new Action();
-        cursorAction.setActionType("CURSOR");
-        cursorAction.setSiteID(Integer.parseInt(userId));
-        cursorAction.setDocumentId(documentId);
-        info.cursors.put(userId, cursorAction);
-        messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", cursorAction);
-        return role;
+        return "invalid";
     }
 
     @MessageMapping("/docs/{documentId}/send-data")
