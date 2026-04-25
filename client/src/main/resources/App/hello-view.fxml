@@ -26,11 +26,17 @@
                 <Label text="Welcome back" styleClass="card-title"/>
                 <Label text="Start writing or join an existing session." styleClass="card-sub"/>
 
-                <Button fx:id="newDocButton"
-                        text="New document"
-                        onAction="#newDoc"
-                        styleClass="btn-primary"
-                        maxWidth="Infinity"/>
+                <HBox spacing="8">
+                    <TextField fx:id="newDocNameField"
+                               promptText="Document name"
+                               styleClass="join-input"
+                               HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="newDocButton"
+                            text="New document"
+                            onAction="#newDoc"
+                            styleClass="btn-primary"
+                            minWidth="120"/>
+                </HBox>
 
                 <Button text="Browse documents"
                         styleClass="btn-secondary"

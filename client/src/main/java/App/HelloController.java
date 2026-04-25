@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,6 +28,7 @@ public class HelloController {
     @FXML private Button newDocButton;
     @FXML private Button joinButton;
     @FXML private TextField sessionCodeField;
+    @FXML private TextField newDocNameField;
 
     private String userId;
 
@@ -42,11 +45,18 @@ public class HelloController {
     @FXML
     private void newDoc() {
         try {
+            String nameInput = null;
+            if (newDocNameField != null) {
+                nameInput = newDocNameField.getText();
+            }
+            if (nameInput == null || nameInput.isBlank()) {
+                nameInput = "New Document";
+            }
             // 1. Create a unique ID for the document
             String docId = UUID.randomUUID().toString();
 
             // 2. Register it on the server and get the generated codes
-            SessionInfo sessionInfo = getCodesFromServer(docId);
+            SessionInfo sessionInfo = getCodesFromServer(docId, nameInput);
 
             String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code=" +
                     sessionInfo.editCode + "&userId=" + userId;
@@ -54,7 +64,7 @@ public class HelloController {
             HttpURLConnection conn = (HttpURLConnection) new URL(joinUrl).openConnection();
 
             // 4. Process the session (this will extract the role and move to the editor)
-            processSession(conn, newDocButton);
+            processSession(conn, newDocButton, nameInput);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -71,14 +81,13 @@ public class HelloController {
 
             HttpURLConnection conn = (HttpURLConnection) new URL(urlString).openConnection();
 
-            // Use the same processSession method for joining
-            processSession(conn, joinButton);
+            // Use the same processSession method for joining (no provided doc name)
+            processSession(conn, joinButton, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
-    private void processSession(HttpURLConnection conn, Button sourceButton) throws Exception {
+    private void processSession(HttpURLConnection conn, Button sourceButton, String providedDocName) throws Exception {
         if (conn.getResponseCode() == 200) {
             String raw = readResponse(conn).trim();
             if (raw.equals("invalid")) {
@@ -86,7 +95,8 @@ public class HelloController {
                 return;
             }
 
-            // The server returns: role:docId:name:editCode:viewCode
+
+            // role:docId:docName:editCode:viewCode
             String[] parts = raw.split(":");
             String role = parts[0];
             String actualDocId = parts[1];
@@ -147,10 +157,11 @@ public class HelloController {
         stage.show();
     }
 
-    private SessionInfo getCodesFromServer(String docId) throws IOException {
+    private SessionInfo getCodesFromServer(String docId, String name) throws IOException {
+        String encodedName = URLEncoder.encode(name == null ? "" : name, StandardCharsets.UTF_8);
         URL url = new URL("https://apt-project-production-326d.up.railway.app/docs/" + docId + "/get-codes" +
                 "?userId=" + userId +
-                "&name=" + "New_Document"); //hardcoded for now should be changed later
+                "&name=" + encodedName);
 
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
