@@ -1,6 +1,7 @@
 package App;
 
 import App.crdt.action.Action;
+import net.datafaker.Faker;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -11,13 +12,17 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @Controller
 public class ChatController {
     private final SimpMessagingTemplate messagingTemplate;
     private final ActionRepository actionRepository; // Use the repository instead
+    private final Faker faker = new Faker();
     // Session info: docId -> SessionInfo
     private final Map<String, SessionInfo> sessions = new HashMap<>();
 
@@ -36,12 +41,22 @@ public class ChatController {
         Map<String, Action> cursors = new HashMap<>();
     }
 
+    private String generateReadableCode() {
+        return String.format("%s-%s-%s-%d",
+                // Use funnyName() as a substitute for adjectives
+                faker.funnyName().name().toLowerCase().replace(" ", ""),
+                faker.color().name().toLowerCase().replace(" ", ""),
+                faker.animal().name().toLowerCase().replace(" ", ""),
+                faker.random().nextInt(10, 99)
+        );
+    }
+
     // Generate codes for a document session
     private SessionInfo getOrCreateSession(String docId) {
         return sessions.computeIfAbsent(docId, id -> {
             SessionInfo info = new SessionInfo();
-            info.editCode = UUID.randomUUID().toString().substring(0, 8);
-            info.viewCode = UUID.randomUUID().toString().substring(0, 8);
+            info.editCode = generateReadableCode();
+            info.viewCode = generateReadableCode();
             return info;
         });
     }
@@ -92,7 +107,7 @@ public class ChatController {
         }
     }
 
-    @SubscribeMapping("/docs/{docId}/initial-state")
+    @SubscribeMapping("/docs/{docId}/initcdial-state")
     public List<Action> initialState(@DestinationVariable String docId) {
         System.out.println("User subscribed to " + docId + ". Sending full history...");
         List<Action> history = actionRepository.findByDocumentId(docId);
