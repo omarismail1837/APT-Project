@@ -48,10 +48,8 @@ public class HelloController {
             // 2. Register it on the server and get the generated codes
             SessionInfo sessionInfo = getCodesFromServer(docId);
 
-            // 3. Use the Global Join to enter as the host/editor
-            String numericId = String.valueOf(Math.abs(userId.hashCode()));
             String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code=" +
-                    sessionInfo.editCode + "&userId=" + numericId;
+                    sessionInfo.editCode + "&userId=" + userId;
 
             HttpURLConnection conn = (HttpURLConnection) new URL(joinUrl).openConnection();
 
@@ -68,9 +66,8 @@ public class HelloController {
             String inputCode = sessionCodeField.getText();
             if (inputCode == null || inputCode.isBlank()) return;
 
-            String numericId = String.valueOf(Math.abs(userId.hashCode()));
             String urlString = "https://apt-project-production-326d.up.railway.app/join?code=" +
-                    inputCode + "&userId=" + numericId;
+                    inputCode + "&userId=" + userId;
 
             HttpURLConnection conn = (HttpURLConnection) new URL(urlString).openConnection();
 
@@ -150,7 +147,10 @@ public class HelloController {
     }
 
     private SessionInfo getCodesFromServer(String docId) throws IOException {
-        URL url = new URL("https://apt-project-production-326d.up.railway.app/docs/" + docId + "/get-codes");
+        URL url = new URL("https://apt-project-production-326d.up.railway.app/docs/" + docId + "/get-codes" +
+                "?userId=" + userId +
+                "&name=" + "New_Document"); //hardcoded for now should be changed later
+
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
         if (conn.getResponseCode() != 200) {
