@@ -6,6 +6,9 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@RestController
 @Controller
 public class ChatController {
     private final SimpMessagingTemplate messagingTemplate;
@@ -46,8 +50,8 @@ public class ChatController {
     }
 
     // Endpoint to get codes for a document
-    @MessageMapping("/docs/{documentId}/get-codes")
-    public Map<String, String> getCodes(@DestinationVariable String documentId) {
+    @GetMapping("docs/{documentId}/get-codes")
+    public Map<String, String> getCodes(@PathVariable String documentId) {
         SessionInfo info = getOrCreateSession(documentId);
         Map<String, String> codes = new HashMap<>();
         codes.put("editCode", info.editCode);
@@ -56,8 +60,8 @@ public class ChatController {
     }
 
     // Endpoint to join a session (returns role) -- now requires documentId
-    @MessageMapping("/docs/{documentId}/join-session")
-    public String joinSession(@DestinationVariable String documentId, Action action) {
+    @GetMapping("/docs/{documentId}/join-session")
+    public String joinSession(@PathVariable String documentId, Action action) {
         String code = String.valueOf(action.getExtraData()); // client sends code in extraData
         String userId = action.getExtraData();
         SessionInfo info = sessions.get(documentId);
