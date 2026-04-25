@@ -131,6 +131,20 @@ public class HelloController {
         if (cssUrl != null) scene.getStylesheets().add(cssUrl.toExternalForm());
 
         Stage stage = (Stage) sourceButton.getScene().getWindow();
+
+        // Make sure the BlankController gets a chance to cleanup (disconnect websocket)
+        Object controller = loader.getController();
+        if (controller instanceof BlankController) {
+            BlankController bc = (BlankController) controller;
+            stage.setOnCloseRequest(evt -> {
+                try {
+                    bc.close();
+                } catch (Exception ex) {
+                    System.err.println("Error during stage close: " + ex.getMessage());
+                }
+            });
+        }
+
         stage.setScene(scene);
         stage.show();
     }

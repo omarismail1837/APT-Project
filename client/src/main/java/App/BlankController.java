@@ -129,6 +129,12 @@ public class BlankController implements Initializable {
                 broadcastCursorPosition(textArea.getCaretPosition())));
 
         wsService.connect("https://apt-project-production-326d.up.railway.app/ws-connect");
+        // Update UI when websocket disconnects
+        wsService.setOnDisconnected(() -> javafx.application.Platform.runLater(() -> {
+            if (connectedLabel != null) {
+                connectedLabel.setText("Disconnected");
+            }
+        }));
         updateActiveUsersPanel();
 
         javafx.application.Platform.runLater(() -> {
@@ -151,6 +157,46 @@ public class BlankController implements Initializable {
         // Enable/disable editing
         if (textArea != null) {
             textArea.setEditable(canEdit);
+        }
+    }
+
+    /**
+     * Gracefully close resources associated with this controller.
+     * Call this when the window is closed to ensure the websocket disconnects.
+     */
+    public void close() {
+        try {
+            if (wsService != null) {
+                // Build and send a DISCONNECT action so the server can broadcast it to other clients
+                long thisClock = ++clock;
+                long now = System.currentTimeMillis();
+                String userName = remoteUserNames.getOrDefault(mySiteID, "User-" + (mySiteID % 1000));
+                Action action = new Action(thisClock, now, mySiteID, docID, "DISCONNECT", null, null, userName);
+
+                // mark as seen so we don't re-apply our own disconnect when it echoes back
+                seenActionIds.add(buildActionId(action));
+
+                // Attempt to send the action. If the session is disconnected this will enqueue it.
+                try {
+                    wsService.sendAction(action);
+                } catch (Exception e) {
+                    System.err.println("Failed to send DISCONNECT action: " + e.getMessage());
+                }
+
+                // Give a short grace period for the disconnect message to be transmitted, then disconnect.
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(200); // 200ms
+                    } catch (InterruptedException ignored) {}
+                    try {
+                        wsService.disconnect();
+                    } catch (Exception ex) {
+                        System.err.println("Error while disconnecting WS: " + ex.getMessage());
+                    }
+                }, "ws-disconnect-thread").start();
+            }
+        } catch (Exception ex) {
+            System.err.println("Error while closing BlankController: " + ex.getMessage());
         }
     }
 
@@ -486,6 +532,25 @@ public class BlankController implements Initializable {
         }
 
         rememberRemoteUser(incomingAction);
+
+        // If a client is notifying about disconnecting, remove their cursor & user entry
+        if ("DISCONNECT".equalsIgnoreCase(incomingAction.getActionType())) {
+            int siteID = incomingAction.getSiteID();
+            if (siteID != mySiteID) {
+                remoteCursorPositions.remove(siteID);
+                remoteUserNames.remove(siteID);
+
+                boolean previousRemoteFlag = isRemoteUpdate;
+                isRemoteUpdate = true;
+                try {
+                    updateActiveUsersPanel();
+                    applyStyles();
+                } finally {
+                    isRemoteUpdate = previousRemoteFlag;
+                }
+            }
+            return;
+        }
 
         if ("CURSOR".equals(incomingAction.getActionType())) {
             int siteID = incomingAction.getSiteID();

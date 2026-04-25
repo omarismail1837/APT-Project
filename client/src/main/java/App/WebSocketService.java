@@ -27,6 +27,8 @@ public class WebSocketService {
     private final Queue<Action> bufferedLiveUpdates = new ConcurrentLinkedQueue<>();
     private final AtomicInteger replayState = new AtomicInteger(0);
     private final Runnable onConnected;
+    // optional hook invoked when the client intentionally disconnects or is disconnected
+    private Runnable onDisconnected;
     private final String docID;
 
     // Safety timer to prevent getting stuck in "Buffering" forever
@@ -36,6 +38,44 @@ public class WebSocketService {
         this.docID = documentId;
         this.onActionReceived = onActionReceived;
         this.onConnected = onConnected;
+    }
+
+    public void setOnDisconnected(Runnable onDisconnected) {
+        this.onDisconnected = onDisconnected;
+    }
+
+
+    public boolean isConnected() {
+        StompSession s = session;
+        return s != null && s.isConnected();
+    }
+
+    public void disconnect() {
+        StompSession s = session;
+        if (s != null) {
+            try {
+                // Ask the STOMP session to disconnect gracefully
+                s.disconnect();
+
+            } catch (Exception ex) {
+                // disconnect() may throw for already-closed sessions; nothing more we can do here.
+                System.err.println("[WS] Error while disconnecting: " + ex.getMessage());
+            }
+        }
+
+        // Null out the session reference so callers know we're disconnected
+        session = null;
+
+        // Stop the safety scheduler to avoid stray tasks running after disconnect.
+        try {
+            scheduler.shutdownNow();
+        } catch (Exception ignored) {}
+
+        if (onDisconnected != null) {
+            try {
+                onDisconnected.run();
+            } catch (Exception ignored) {}
+        }
     }
 
     public void connect(String url) {
