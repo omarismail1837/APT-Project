@@ -48,7 +48,7 @@ public class ChatController {
     private String generateReadableCode() {
         return String.format("%s-%s-%s-%d",
                 // Use funnyName() as a substitute for adjectives
-                faker.funnyName().name().toLowerCase().replace(" ", ""),
+                faker.country().name().toLowerCase().replace(" ", ""),
                 faker.color().name().toLowerCase().replace(" ", ""),
                 faker.animal().name().toLowerCase().replace(" ", ""),
                 faker.random().nextInt(10, 99)
