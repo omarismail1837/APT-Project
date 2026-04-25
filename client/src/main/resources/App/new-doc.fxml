@@ -15,7 +15,7 @@
         <VBox style="-fx-background-color: #1e1e1e; -fx-background-radius: 8; -fx-border-color: #333; -fx-border-radius: 8; -fx-border-width: 1;">
 
             <HBox alignment="CENTER_LEFT" spacing="15" style="-fx-padding: 15; -fx-border-color: transparent transparent #333 transparent; -fx-border-width: 1;">
-                <Label text="my-document.txt" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 14;"/>
+                <Label fx:id="nameLabel" text="my-document.txt" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 14;"/>
 
                 <Label fx:id="docIdLabel" style="-fx-text-fill: #888; -fx-font-family: 'monospace'; -fx-font-size: 12;" />
                 <Label fx:id="sessionCodeLabel" style="-fx-text-fill: #4ade80; -fx-font-family: 'monospace'; -fx-font-size: 12;" />

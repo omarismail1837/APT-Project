@@ -86,22 +86,23 @@ public class HelloController {
                 return;
             }
 
-            // The server returns: role:docId:editCode:viewCode
+            // The server returns: role:docId:name:editCode:viewCode
             String[] parts = raw.split(":");
             String role = parts[0];
             String actualDocId = parts[1];
-            String serverEditCode = parts[2];
-            String viewCode = parts[3];
+            String docName = parts[2];
+            String serverEditCode = parts[3];
+            String viewCode = parts[4];
 
             boolean canEdit = role.equalsIgnoreCase("editor");
             String finalEditCode = "null".equals(serverEditCode) ? null : serverEditCode;
 
             // Call loader with the correct order of arguments
-            loadEditorScene(actualDocId, viewCode, finalEditCode, canEdit, userId, sourceButton);
+            loadEditorScene(actualDocId, docName, viewCode, finalEditCode, canEdit, userId, sourceButton);
         }
     }
 
-    private void loadEditorScene(String docID, String viewCode, String editCode, boolean canEdit, String userId, Button sourceButton) throws IOException {
+    private void loadEditorScene(String docID, String docName, String viewCode, String editCode, boolean canEdit, String userId, Button sourceButton) throws IOException {
         // Ensure you use the correct FXML name (blank-view.fxml or new-doc.fxml)
         URL fxmlUrl = resolveFxml("/App/blank-view.fxml");
         if (fxmlUrl == null) fxmlUrl = resolveFxml("/App/new-doc.fxml");
@@ -112,7 +113,7 @@ public class HelloController {
         loader.setControllerFactory(type -> {
             if (type == BlankController.class) {
                 int siteID = Math.abs(userId.hashCode());
-                return new BlankController(docID, viewCode, editCode, siteID, this.blockDLL, canEdit);
+                return new BlankController(docID, docName, viewCode, editCode, siteID, this.blockDLL, canEdit);
             }
             try {
                 return type.getDeclaredConstructor().newInstance();

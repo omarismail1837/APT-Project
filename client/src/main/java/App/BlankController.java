@@ -31,26 +31,28 @@ import java.util.function.Consumer;
 // recv ops from other users via websocket & apply to doc
 public class BlankController implements Initializable {
 
-    public BlankController(String docID, String viewCode, String editCode, int mySiteID, BlockDLL blockDLL, boolean canEdit) {
+    public BlankController(String docID, String docName, String viewCode, String editCode, int mySiteID, BlockDLL blockDLL, boolean canEdit) {
         this.docID = docID;
         this.editCode = editCode;
         this.viewCode = viewCode;
         this.mySiteID = mySiteID;
         this.blockDLL = blockDLL;
         this.canEdit = canEdit;
+        this.docName = docName;
     }
 
     public BlankController(BlockDLL blockDLL) {
         // Chains to the main constructor with placeholder values
-        this("local-doc", "N/A", null, 0, blockDLL, true);
+        this("local-doc", "N/A", "N/A", null, 0, blockDLL, true);
     }
 
     private final int mySiteID;
+    private final String docName;
     private long clock = 0;
 
     //Document ID
     private String docID;
-    @FXML private Label docIdLabel; // Must match fx:id in FXML
+    @FXML private Label nameLabel;
     public void setDocID(String docID) {
         this.docID = docID;
         System.out.println("DocID: " + docID);
@@ -142,8 +144,8 @@ public class BlankController implements Initializable {
         });
         textArea.setStyle("-fx-caret-color: " + colorForSite(mySiteID) + ";");
 
-        if (docIdLabel != null) {
-            docIdLabel.setText("ID: " + docID);
+        if (nameLabel != null) {
+            nameLabel.setText(docName + ".txt");
         }
         if (sessionCodeLabel != null) {
             if (canEdit && viewCode != null && !viewCode.isEmpty()) {
