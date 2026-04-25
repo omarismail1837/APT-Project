@@ -208,4 +208,9 @@ public class ChatController {
             }
         }, 5, TimeUnit.MINUTES);
     }
+
+    @GetMapping("/docs/{userId}")
+    private List<DocMetadata> getDocs(@PathVariable String userId) {
+        return docRepository.findByOwnerId(userId);
+    }
 }
