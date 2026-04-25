@@ -78,7 +78,7 @@ public class ChatController {
         // Broadcast cursor add for this user
         Action cursorAction = new Action();
         cursorAction.setActionType("CURSOR");
-        cursorAction.setSiteID(userId);
+        cursorAction.setSiteID(Integer.parseInt(userId));
         cursorAction.setDocumentId(documentId);
         info.cursors.put(userId, cursorAction);
         messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", cursorAction);
