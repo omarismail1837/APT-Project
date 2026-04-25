@@ -11,11 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @RestController
 @Controller
@@ -62,13 +58,18 @@ public class ChatController {
 
     @GetMapping("/join")
     public String join(@RequestParam String code, @RequestParam String userId) {
-        for (SessionInfo info : sessions.values()) {
+        for (Map.Entry<String, SessionInfo> entry : sessions.entrySet()) {
+            String docId = entry.getKey();
+            SessionInfo info = entry.getValue();
+
             if (code.equals(info.editCode)) {
-                info.editors.add(userId);
-                return "editor";
+                if (!info.editors.contains(userId)) info.editors.add(userId);
+                // Format: role:docId:editCode:viewCode
+                return "editor:" + docId + ":" + info.editCode + ":" + info.viewCode;
             } else if (code.equals(info.viewCode)) {
-                info.viewers.add(userId);
-                return "viewer";
+                if (!info.viewers.contains(userId)) info.viewers.add(userId);
+                // For viewers, we still send the editCode so the UI can display it as "Hidden" or null
+                return "viewer:" + docId + ":" + info.editCode + ":" + info.viewCode;
             }
         }
         return "invalid";
