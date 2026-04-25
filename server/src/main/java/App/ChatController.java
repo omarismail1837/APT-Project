@@ -107,7 +107,7 @@ public class ChatController {
         }
     }
 
-    @SubscribeMapping("/docs/{docId}/initcdial-state")
+    @SubscribeMapping("/docs/{docId}/initial-state")
     public List<Action> initialState(@DestinationVariable String docId) {
         System.out.println("User subscribed to " + docId + ". Sending full history...");
         List<Action> history = actionRepository.findByDocumentId(docId);
