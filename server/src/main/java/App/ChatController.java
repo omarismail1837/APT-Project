@@ -118,15 +118,18 @@ public class ChatController {
         for (Map.Entry<String, SessionInfo> entry : sessions.entrySet()) {
             String docId = entry.getKey();
             SessionInfo info = entry.getValue();
+            DocMetadata doc = docRepository.findById(docId).orElse(null);
+            String name = null;
+            if (doc!=null) name = doc.getName();
 
             if (code.equals(info.editCode)) {
                 if (!info.editors.contains(userId)) info.editors.add(userId);
                 // Format: role:docId:editCode:viewCode
-                return "editor:" + docId + ":" + info.editCode + ":" + info.viewCode;
+                return "editor:" + docId + ":" + name + ":" + info.editCode + ":" + info.viewCode;
             } else if (code.equals(info.viewCode)) {
                 if (!info.viewers.contains(userId)) info.viewers.add(userId);
                 // For viewers, we still send the editCode so the UI can display it as "Hidden" or null
-                return "viewer:" + docId + ":" + info.editCode + ":" + info.viewCode;
+                return "viewer:" + docId + ":" + name + ":" + info.editCode + ":" + info.viewCode;
             }
         }
         return "invalid";
