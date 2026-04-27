@@ -123,11 +123,17 @@ public class ChatController {
             if (doc!=null) name = doc.getName();
 
             if (code.equals(info.editCode)) {
-                if (!info.editors.contains(userId)) info.editors.add(userId);
+                if (!info.editors.contains(userId)) {
+                    info.editors.add(userId);
+                    System.out.println("new editor: " + userId);
+                }
                 // Format: role:docId:editCode:viewCode
                 return "editor:" + docId + ":" + name + ":" + info.editCode + ":" + info.viewCode;
             } else if (code.equals(info.viewCode)) {
-                if (!info.viewers.contains(userId)) info.viewers.add(userId);
+                if (!info.viewers.contains(userId)) {
+                    info.viewers.add(userId);
+                    System.out.println("new viewer: " + userId);
+                }
                 // For viewers, we still send the editCode so the UI can display it as "Hidden" or null
                 return "viewer:" + docId + ":" + name + ":" + info.editCode + ":" + info.viewCode;
             }
