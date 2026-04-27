@@ -23,14 +23,14 @@
 
                 <Separator orientation="VERTICAL" prefHeight="25" style="-fx-opacity: 0.1;"/>
 
-                <VBox alignment="CENTER_LEFT" spacing="2" minWidth="210" HBox.hgrow="ALWAYS">
+                <VBox alignment="CENTER_LEFT" spacing="2" minWidth="210" prefWidth="310" maxWidth="310" HBox.hgrow="SOMETIMES">
                     <Label fx:id="editCodeLabel"
                            textOverrun="ELLIPSIS"
-                           maxWidth="Infinity"
+                           maxWidth="300"
                            style="-fx-text-fill: #4ade80; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
                     <Label fx:id="viewCodeLabel"
                            textOverrun="ELLIPSIS"
-                           maxWidth="Infinity"
+                           maxWidth="300"
                            style="-fx-text-fill: #93c5fd; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
                 </VBox>
 

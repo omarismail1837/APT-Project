@@ -16,6 +16,8 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import org.fxmisc.richtext.Caret;
+import org.fxmisc.richtext.CaretNode;
 import org.fxmisc.richtext.StyleClassedTextArea;
 import org.fxmisc.richtext.model.RichTextChange;
 
@@ -85,6 +87,8 @@ public class BlankController implements Initializable {
     private final Map<Integer, String> remoteCursorPositions = new LinkedHashMap<>();
     // siteID -> display name
     private final Map<Integer, String> remoteUserNames = new LinkedHashMap<>();
+    // siteID -> visual caret in the editor
+    private final Map<Integer, CaretNode> remoteCarets = new HashMap<>();
     // siteID -> color index (0-3), assigned by server via Action.colorIndex
     private final Map<Integer, Integer> siteColorIndices = new HashMap<>();
     private long lastCursorBroadcastMs = 0;
@@ -122,12 +126,17 @@ public class BlankController implements Initializable {
 
         setupCodeLabels();
 
-        // Color own caret to match our assigned color
         if (textArea != null) {
             textArea.setStyle("-fx-caret-color: " + colorForSite(mySiteID) + ";");
         }
 
         updateActiveUsersPanel();
+    }
+
+    private void updateRemoteCaretColor(int siteID) {
+        CaretNode caret = remoteCarets.get(siteID);
+        if (caret == null) return;
+        caret.setStroke(Color.web(colorForSite(siteID)));
     }
 
     private void setupCodeLabels() {
@@ -234,7 +243,9 @@ public class BlankController implements Initializable {
     private void applyAndSend(Action action) {
         blockDLL.applyAction(action);
         seenActionIds.add(buildActionId(action));
-        wsService.sendAction(action);
+        if (wsService != null) {
+            wsService.sendAction(action);
+        }
     }
 
     // 8. remote action handlers
@@ -244,7 +255,17 @@ public class BlankController implements Initializable {
 
         // Track color assignment from server
         if (action.getColorIndex() >= 0) {
-            siteColorIndices.put(action.getSiteID(), action.getColorIndex());
+            Integer prev = siteColorIndices.put(action.getSiteID(), action.getColorIndex());
+            if (prev == null || prev != action.getColorIndex()) {
+                if (action.getSiteID() == mySiteID) {
+                    if (textArea != null) {
+                        textArea.setStyle("-fx-caret-color: " + colorForSite(mySiteID) + ";");
+                    }
+                } else {
+                    updateRemoteCaretColor(action.getSiteID());
+                }
+                withRemoteFlag(this::updateActiveUsersPanel);
+            }
         }
 
         String type = action.getActionType();
@@ -266,6 +287,7 @@ public class BlankController implements Initializable {
             int siteID = action.getSiteID();
             remoteCursorPositions.remove(siteID);
             remoteUserNames.remove(siteID);
+            removeRemoteCaret(siteID);
             withRemoteFlag(this::refreshUI);
             return;
         }
@@ -303,11 +325,13 @@ public class BlankController implements Initializable {
 
         remoteCursorPositions.remove(siteID);
         remoteUserNames.remove(siteID);
+        removeRemoteCaret(siteID);
         withRemoteFlag(this::refreshUI);
     }
 
     // 9. cursor broadcasting
     private void broadcastCursorPosition(int caretPos) {
+        if (wsService == null) return;
         long now = now();
         if (now - lastCursorBroadcastMs < CURSOR_THROTTLE_MS) return;
         lastCursorBroadcastMs = now;
@@ -328,26 +352,21 @@ public class BlankController implements Initializable {
     }
 
     // 10. rendering
-    // full re-render: rebuild text from CRDT, apply formatting styles, then overlay remote cursor highlights.
+    // full re-render: rebuild text from CRDT, apply formatting styles, then reposition remote carets.
     private void rerender(int preferredCaret) {
         withRemoteFlag(() -> {
             refreshMapping();
             textArea.replaceText(blockDLL.collectText());
             applyStyles();
+            updateRemoteCarets();
 
             int safeCaret = Math.max(0, Math.min(preferredCaret, textArea.getLength()));
             textArea.selectRange(safeCaret, safeCaret);
         });
     }
 
-    // applies bold/italic styles to every visible character then overlays remote cursor highlights on top
+    // applies bold/italic styles to every visible character
     private void applyStyles() {
-        // build a reverse map, charID → siteID for fast lookup
-        Map<String, Integer> cursorCharToSite = new HashMap<>();
-        for (Map.Entry<Integer, String> e : remoteCursorPositions.entrySet()) {
-            cursorCharToSite.put(e.getValue(), e.getKey());
-        }
-
         int docLength = textArea.getLength();
         for (int i = 0; i < visibleNodes.size() && i < docLength; i++) {
             CharNode c = visibleNodes.get(i);
@@ -355,15 +374,60 @@ public class BlankController implements Initializable {
             // base formatting class
             String baseClass = resolveBaseClass(c);
 
-            // check if a remote cursor sits at this character
-            Integer siteAtCursor = cursorCharToSite.get(c.getCharID());
-            if (siteAtCursor != null) {
-                int colorIdx = colorIndexForSite(siteAtCursor);
-                textArea.setStyle(i, i + 1, Arrays.asList(baseClass, "remote-cursor-" + colorIdx));
-            } else {
-                textArea.setStyleClass(i, i + 1, baseClass);
+            textArea.setStyleClass(i, i + 1, baseClass);
+        }
+    }
+
+    private void updateRemoteCarets() {
+        if (textArea == null) return;
+
+        for (Integer siteID : new ArrayList<>(remoteCarets.keySet())) {
+            if (!remoteCursorPositions.containsKey(siteID)) {
+                removeRemoteCaret(siteID);
             }
         }
+
+        for (Map.Entry<Integer, String> entry : remoteCursorPositions.entrySet()) {
+            int siteID = entry.getKey();
+            if (siteID == mySiteID) continue;
+
+            int position = resolveTextAreaIndexForCharID(entry.getValue());
+            if (position < 0) {
+                removeRemoteCaret(siteID);
+                continue;
+            }
+
+            CaretNode caret = remoteCarets.computeIfAbsent(siteID, this::createRemoteCaret);
+            caret.moveTo(Math.max(0, Math.min(position, textArea.getLength())));
+        }
+    }
+
+    private CaretNode createRemoteCaret(int siteID) {
+        CaretNode caret = new CaretNode("remote-caret-" + siteID, textArea);
+        caret.setShowCaret(Caret.CaretVisibility.ON);
+        caret.setStroke(Color.web(colorForSite(siteID)));
+        caret.setStrokeWidth(2);
+        caret.setManaged(false);
+        caret.setMouseTransparent(true);
+        caret.setFocusTraversable(false);
+        textArea.addCaret(caret);
+        return caret;
+    }
+
+    private void removeRemoteCaret(int siteID) {
+        CaretNode caret = remoteCarets.remove(siteID);
+        if (caret == null || textArea == null) return;
+
+        textArea.removeCaret(caret);
+        caret.dispose();
+    }
+
+    private int resolveTextAreaIndexForCharID(String charID) {
+        if (charID == null || charID.equals(getSeedHeadID())) return 0;
+        for (int i = 0; i < visibleNodes.size(); i++) {
+            if (charID.equals(visibleNodes.get(i).getCharID())) return i;
+        }
+        return -1;
     }
 
     private String resolveBaseClass(CharNode c) {
@@ -373,12 +437,12 @@ public class BlankController implements Initializable {
         return "regular";
     }
 
-    // refreshes only the users panel and cursor highlights, without replacing text
+    // refreshes only the users panel and remote carets, without replacing text
     private void refreshUI() {
         updateActiveUsersPanel();
         applyStyles();
+        updateRemoteCarets();
     }
-
 
     // 11. formatting actions
     @FXML
@@ -418,6 +482,7 @@ public class BlankController implements Initializable {
     // 12. active users panel
     private void updateActiveUsersPanel() {
         if (activeUsersBox == null) return;
+
         activeUsersBox.getChildren().clear();
 
         // always show ourselves first
@@ -496,6 +561,7 @@ public class BlankController implements Initializable {
                     }
                 }, "ws-disconnect-thread").start();
             }
+            new ArrayList<>(remoteCarets.keySet()).forEach(this::removeRemoteCaret);
         } catch (Exception ex) {
             System.err.println("Error while closing BlankController: " + ex.getMessage());
         }
