@@ -6,7 +6,10 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.json.JSONObject;
 
@@ -27,8 +30,25 @@ public class HelloController {
 
     @FXML private Button newDocButton;
     @FXML private Button joinButton;
+    @FXML private Button showSignupButton;
+    @FXML private Button showLoginButton;
+    @FXML private Button backToSessionButton;
+    @FXML private Button backFromLoginButton;
+    @FXML private Button createAccountButton;
+    @FXML private Button loginAccountButton;
     @FXML private TextField sessionCodeField;
     @FXML private TextField newDocNameField;
+    @FXML private TextField signupNameField;
+    @FXML private TextField signupEmailField;
+    @FXML private TextField loginEmailField;
+    @FXML private PasswordField signupPasswordField;
+    @FXML private PasswordField signupConfirmPasswordField;
+    @FXML private PasswordField loginPasswordField;
+    @FXML private VBox sessionPane;
+    @FXML private VBox signupPane;
+    @FXML private VBox loginPane;
+    @FXML private Label signupStatusLabel;
+    @FXML private Label loginStatusLabel;
 
     private int userId;
 
@@ -39,7 +59,7 @@ public class HelloController {
 
     @FXML
     public void initialize() {
-        // UI is ready here
+        showSessionPane();
     }
 
     @FXML
@@ -87,6 +107,7 @@ public class HelloController {
             e.printStackTrace();
         }
     }
+
     private void processSession(HttpURLConnection conn, Button sourceButton, String providedDocName) throws Exception {
         if (conn.getResponseCode() == 200) {
             String raw = readResponse(conn).trim();
@@ -210,5 +231,102 @@ public class HelloController {
         } catch (Exception e) {
             return null;
         }
+    }
+
+
+    @FXML
+    private void showSignup() {
+        clearStatusLabels();
+        setVisiblePane(signupPane);
+    }
+
+    @FXML
+    private void showLogin() {
+        clearStatusLabels();
+        setVisiblePane(loginPane);
+    }
+
+    @FXML
+    private void showSessionPane() {
+        clearStatusLabels();
+        setVisiblePane(sessionPane);
+    }
+
+    @FXML
+    private void createAccount() {
+        String name = signupNameField != null ? signupNameField.getText().trim() : "";
+        String email = signupEmailField != null ? signupEmailField.getText().trim() : "";
+        String password = signupPasswordField != null ? signupPasswordField.getText() : "";
+        String confirm = signupConfirmPasswordField != null ? signupConfirmPasswordField.getText() : "";
+
+        if (name.isBlank() || email.isBlank() || password.isBlank() || confirm.isBlank()) {
+            setSignupStatus("Fill in all fields.");
+            return;
+        }
+        if (!email.contains("@") || !email.contains(".")) {
+            setSignupStatus("Enter a valid email address.");
+            return;
+        }
+        if (password.length() < 8) {
+            setSignupStatus("Use at least 8 characters for the password.");
+            return;
+        }
+        if (!password.equals(confirm)) {
+            setSignupStatus("Passwords do not match.");
+            return;
+        }
+
+        setSignupStatus("Account profile saved locally. You can start a document now.");
+        if (newDocNameField != null && newDocNameField.getText().isBlank()) {
+            newDocNameField.setText(name + "'s document");
+        }
+        showSessionPane();
+    }
+
+    @FXML
+    private void loginAccount() {
+        String email = loginEmailField != null ? loginEmailField.getText().trim() : "";
+        String password = loginPasswordField != null ? loginPasswordField.getText() : "";
+
+        if (email.isBlank() || password.isBlank()) {
+            setLoginStatus("Enter your email and password.");
+            return;
+        }
+        if (!email.contains("@") || !email.contains(".")) {
+            setLoginStatus("Enter a valid email address.");
+            return;
+        }
+
+        setLoginStatus("Login profile loaded locally. Session tools are ready.");
+        showSessionPane();
+    }
+
+    private void setSignupStatus(String message) {
+        if (signupStatusLabel != null) {
+            signupStatusLabel.setText(message);
+        }
+    }
+
+    private void setLoginStatus(String message) {
+        if (loginStatusLabel != null) {
+            loginStatusLabel.setText(message);
+        }
+    }
+
+    private void clearStatusLabels() {
+        if (signupStatusLabel != null) signupStatusLabel.setText("");
+        if (loginStatusLabel != null) loginStatusLabel.setText("");
+    }
+
+    private void setVisiblePane(VBox targetPane) {
+        setPaneVisible(sessionPane, targetPane == sessionPane);
+        setPaneVisible(signupPane, targetPane == signupPane);
+        setPaneVisible(loginPane, targetPane == loginPane);
+    }
+
+    private void setPaneVisible(VBox pane, boolean visible) {
+        if (pane == null) return;
+        pane.setVisible(visible);
+        pane.setManaged(visible);
     }
 }

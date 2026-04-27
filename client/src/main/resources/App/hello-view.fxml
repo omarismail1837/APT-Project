@@ -7,6 +7,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.geometry.Insets?>
@@ -23,42 +24,111 @@
         <StackPane styleClass="body-pane">
             <VBox styleClass="card" spacing="10" maxWidth="420">
 
-                <Label text="Welcome back" styleClass="card-title"/>
-                <Label text="Start writing or join an existing session." styleClass="card-sub"/>
+                <VBox fx:id="sessionPane" spacing="10">
+                    <Label text="Welcome back" styleClass="card-title"/>
+                    <Label text="Start writing or join an existing session." styleClass="card-sub"/>
 
-                <HBox spacing="8">
-                    <TextField fx:id="newDocNameField"
-                               promptText="Document name"
-                               styleClass="join-input"
-                               HBox.hgrow="ALWAYS"/>
-                    <Button fx:id="newDocButton"
-                            text="New document"
-                            onAction="#newDoc"
-                            styleClass="btn-primary"
-                            minWidth="120"/>
-                </HBox>
+                    <HBox spacing="8">
+                        <TextField fx:id="newDocNameField"
+                                   promptText="Document name"
+                                   styleClass="join-input"
+                                   HBox.hgrow="ALWAYS"/>
+                        <Button fx:id="newDocButton"
+                                text="New document"
+                                onAction="#newDoc"
+                                styleClass="btn-primary"
+                                minWidth="120"/>
+                    </HBox>
 
-                <Button text="Browse documents"
-                        styleClass="btn-secondary"
-                        maxWidth="Infinity"/>
-
-                <HBox styleClass="divider-row" alignment="CENTER" spacing="10">
-                    <Separator HBox.hgrow="ALWAYS"/>
-                    <Label text="or join with a code" styleClass="divider-label"/>
-                    <Separator HBox.hgrow="ALWAYS"/>
-                </HBox>
-
-                <HBox spacing="8">
-                    <TextField fx:id="sessionCodeField"
-                               promptText="Session code"
-                               styleClass="join-input"
-                               HBox.hgrow="ALWAYS"/>
-                    <Button fx:id="joinButton"
-                            text="Join session"
-                            onAction="#joinSession"
+                    <Button text="Browse documents"
                             styleClass="btn-secondary"
-                            minWidth="110"/>
-                </HBox>
+                            maxWidth="Infinity"/>
+
+                    <HBox styleClass="divider-row" alignment="CENTER" spacing="10">
+                        <Separator HBox.hgrow="ALWAYS"/>
+                        <Label text="or join with a code" styleClass="divider-label"/>
+                        <Separator HBox.hgrow="ALWAYS"/>
+                    </HBox>
+
+                    <HBox spacing="8">
+                        <TextField fx:id="sessionCodeField"
+                                   promptText="Session code"
+                                   styleClass="join-input"
+                                   HBox.hgrow="ALWAYS"/>
+                        <Button fx:id="joinButton"
+                                text="Join session"
+                                onAction="#joinSession"
+                                styleClass="btn-secondary"
+                                minWidth="110"/>
+                    </HBox>
+
+                    <Button fx:id="showSignupButton"
+                            text="Create account"
+                            onAction="#showSignup"
+                            styleClass="btn-link"
+                            maxWidth="Infinity"/>
+                    <Button fx:id="showLoginButton"
+                            text="Log in"
+                            onAction="#showLogin"
+                            styleClass="btn-link"
+                            maxWidth="Infinity"/>
+                </VBox>
+
+                <VBox fx:id="loginPane" spacing="10" visible="false" managed="false">
+                    <Label text="Log in" styleClass="card-title"/>
+                    <Label text="Use your local profile to continue into the workspace." styleClass="card-sub"/>
+
+                    <TextField fx:id="loginEmailField"
+                               promptText="Email address"
+                               styleClass="join-input"/>
+                    <PasswordField fx:id="loginPasswordField"
+                                   promptText="Password"
+                                   styleClass="join-input"/>
+
+                    <Label fx:id="loginStatusLabel" text="" styleClass="status-label"/>
+
+                    <Button fx:id="loginAccountButton"
+                            text="Log in"
+                            onAction="#loginAccount"
+                            styleClass="btn-primary"
+                            maxWidth="Infinity"/>
+                    <Button fx:id="backFromLoginButton"
+                            text="Back to session tools"
+                            onAction="#showSessionPane"
+                            styleClass="btn-secondary"
+                            maxWidth="Infinity"/>
+                </VBox>
+
+                <VBox fx:id="signupPane" spacing="10" visible="false" managed="false">
+                    <Label text="Create account" styleClass="card-title"/>
+                    <Label text="Set up your profile before starting a document." styleClass="card-sub"/>
+
+                    <TextField fx:id="signupNameField"
+                               promptText="Full name"
+                               styleClass="join-input"/>
+                    <TextField fx:id="signupEmailField"
+                               promptText="Email address"
+                               styleClass="join-input"/>
+                    <PasswordField fx:id="signupPasswordField"
+                                   promptText="Password"
+                                   styleClass="join-input"/>
+                    <PasswordField fx:id="signupConfirmPasswordField"
+                                   promptText="Confirm password"
+                                   styleClass="join-input"/>
+
+                    <Label fx:id="signupStatusLabel" text="" styleClass="status-label"/>
+
+                    <Button fx:id="createAccountButton"
+                            text="Create account"
+                            onAction="#createAccount"
+                            styleClass="btn-primary"
+                            maxWidth="Infinity"/>
+                    <Button fx:id="backToSessionButton"
+                            text="Back to session tools"
+                            onAction="#showSessionPane"
+                            styleClass="btn-secondary"
+                            maxWidth="Infinity"/>
+                </VBox>
 
             </VBox>
         </StackPane>

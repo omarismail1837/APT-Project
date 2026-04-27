@@ -47,7 +47,7 @@
                     <HBox spacing="6">
                         <Button text="Undo" styleClass="btn-action"/>
                         <Button text="Redo" styleClass="btn-action"/>
-                        <Button text="Export" styleClass="btn-action" style="-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-border-color: #2563eb;"/>
+                        <Button fx:id="exportButton" text="Export" onAction="#exportDocument" styleClass="btn-action" style="-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-border-color: #2563eb;"/>
                     </HBox>
                 </HBox>
             </HBox>

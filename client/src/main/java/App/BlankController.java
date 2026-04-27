@@ -8,6 +8,7 @@ import App.crdt.character.CharNode;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.IndexRange;
 import javafx.scene.control.Label;
@@ -18,13 +19,18 @@ import javafx.scene.Node;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Path;
 import javafx.scene.shape.Circle;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
 import org.fxmisc.richtext.Caret;
 import org.fxmisc.richtext.CaretNode;
 import org.fxmisc.richtext.StyleClassedTextArea;
 import org.fxmisc.richtext.model.TwoDimensional;
 import org.fxmisc.richtext.model.RichTextChange;
 
+import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 
 // Responsible for:
@@ -103,6 +109,7 @@ public class BlankController implements Initializable {
     @FXML private StyleClassedTextArea textArea;
     @FXML private Button boldButton;
     @FXML private Button italicButton;
+    @FXML private Button exportButton;
     @FXML private Label docIdLabel;
     @FXML private Label lineColLabel;
     @FXML private Label connectedLabel;
@@ -306,13 +313,19 @@ public class BlankController implements Initializable {
         }
 
         // document edit
-        String actionId = buildActionId(action);
-        if (seenActionIds.contains(actionId)) return;
-        seenActionIds.add(actionId);
+        if ("INSERT".equals(type)
+                || "DELETE".equals(type)
+                || "BOLD".equals(type)
+                || "ITALIC".equals(type)) {
 
-        blockDLL.applyAction(action);
-        rerender(textArea.getCaretPosition());
-    }
+            String actionId = buildActionId(action);
+            if (seenActionIds.contains(actionId)) return;
+
+            seenActionIds.add(actionId);
+
+            blockDLL.applyAction(action);
+            rerender(textArea.getCaretPosition());
+        }    }
 
     private void handleRemoteCursor(Action action) {
         int siteID = action.getSiteID();
@@ -358,7 +371,7 @@ public class BlankController implements Initializable {
 
         Action action = new Action(++clock, now, mySiteID, docID,
                 "CURSOR", charID, null, "User-" + (mySiteID % 1000));
-        seenActionIds.add(buildActionId(action));
+//        seenActionIds.add(buildActionId(action));
         wsService.sendAction(action);
     }
 
@@ -377,11 +390,11 @@ public class BlankController implements Initializable {
             refreshMapping();
             textArea.replaceText(blockDLL.collectText());
             applyStyles();
-            updateRemoteCarets();
 
             int safeCaret = Math.max(0, Math.min(preferredCaret, textArea.getLength()));
             textArea.selectRange(safeCaret, safeCaret);
-        });
+
+            javafx.application.Platform.runLater(this::updateRemoteCarets);});
     }
 
     // applies bold/italic styles to every visible character
@@ -411,10 +424,10 @@ public class BlankController implements Initializable {
             if (siteID == mySiteID) continue;
 
             int position = resolveTextAreaIndexForCharID(entry.getValue());
-            if (position < 0) {
-                removeRemoteCaret(siteID);
-                continue;
-            }
+//            if (position < 0) {
+//                removeRemoteCaret(siteID);
+//                continue;
+//            }
 
             CaretNode caret = remoteCarets.computeIfAbsent(siteID, this::createRemoteCaret);
             int clamped = Math.max(0, Math.min(position, textArea.getLength()));
@@ -445,11 +458,18 @@ public class BlankController implements Initializable {
     }
 
     private int resolveTextAreaIndexForCharID(String charID) {
-        if (charID == null || charID.equals(getSeedHeadID())) return 0;
-        for (int i = 0; i < visibleNodes.size(); i++) {
-            if (charID.equals(visibleNodes.get(i).getCharID())) return i + 1;
+        if (charID == null || charID.equals(getSeedHeadID())) {
+            return 0;
         }
-        return -1;
+
+        for (int i = 0; i < visibleNodes.size(); i++) {
+            if (charID.equals(visibleNodes.get(i).getCharID())) {
+                return i + 1;
+            }
+        }
+
+        // anchor vanished -> place at end
+        return textArea.getLength();
     }
 
     private String resolveBaseClass(CharNode c) {
@@ -477,6 +497,35 @@ public class BlankController implements Initializable {
         applyFormattingAction("ITALIC", CharNode::getItalic);
     }
 
+    @FXML
+    private void exportDocument() {
+        Window window = textArea != null && textArea.getScene() != null ? textArea.getScene().getWindow() : null;
+        if (window == null) {
+            showExportAlert(Alert.AlertType.ERROR, "Export failed", "The save dialog could not be opened.");
+            return;
+        }
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export document");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text files", "*.txt"));
+        chooser.setInitialFileName(defaultExportFileName());
+
+        java.nio.file.Path targetPath = null;
+        try {
+            java.io.File selectedFile = chooser.showSaveDialog(window);
+            if (selectedFile == null) return;
+
+            targetPath = selectedFile.toPath();
+            Files.writeString(targetPath, blockDLL.collectText(), StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            showExportAlert(Alert.AlertType.ERROR, "Export failed", "Could not save the text file.");
+            return;
+        }
+
+        showExportAlert(Alert.AlertType.INFORMATION, "Export complete",
+                "Saved " + targetPath.getFileName() + " to your computer.");
+    }
+
     private void applyFormattingAction(String type, java.util.function.Function<CharNode, Boolean> getter) {
         IndexRange sel = textArea.getSelection();
         if (sel.getLength() == 0) return;
@@ -499,6 +548,25 @@ public class BlankController implements Initializable {
 
         applyAndSend(action);
         rerender(textArea.getCaretPosition());
+    }
+
+    private String defaultExportFileName() {
+        String baseName = (docName == null || docName.isBlank()) ? "document" : docName.trim();
+        if (baseName.toLowerCase(Locale.ROOT).endsWith(".txt")) {
+            return baseName;
+        }
+        return baseName + ".txt";
+    }
+
+    private void showExportAlert(Alert.AlertType type, String title, String message) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        if (textArea != null && textArea.getScene() != null) {
+            alert.initOwner(textArea.getScene().getWindow());
+        }
+        alert.showAndWait();
     }
 
     // 12. active users panel
@@ -560,8 +628,8 @@ public class BlankController implements Initializable {
                 Action cursorRemove = new Action(++clock, now, mySiteID, docID, "CURSOR_REMOVE", null, null, userName);
                 Action disconnect = new Action(++clock, now + 1, mySiteID, docID, "DISCONNECT", null, null, userName);
 
-                seenActionIds.add(buildActionId(cursorRemove));
-                seenActionIds.add(buildActionId(disconnect));
+//                seenActionIds.add(buildActionId(cursorRemove));
+//                seenActionIds.add(buildActionId(disconnect));
 
                 try {
                     wsService.sendAction(cursorRemove);
