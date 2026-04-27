@@ -30,11 +30,11 @@ public class HelloController {
     @FXML private TextField sessionCodeField;
     @FXML private TextField newDocNameField;
 
-    private String userId;
+    private int userId;
 
     public HelloController(BlockDLL blockDLL) {
         this.blockDLL = blockDLL;
-        userId = String.valueOf(Math.random() * 10000);
+        userId = String.valueOf(Math.random() * 10000).hashCode();
     }
 
     @FXML
@@ -112,7 +112,7 @@ public class HelloController {
         }
     }
 
-    private void loadEditorScene(String docID, String docName, String viewCode, String editCode, boolean canEdit, String userId, Button sourceButton) throws IOException {
+    private void loadEditorScene(String docID, String docName, String viewCode, String editCode, boolean canEdit, int userId, Button sourceButton) throws IOException {
         // Ensure you use the correct FXML name (blank-view.fxml or new-doc.fxml)
         URL fxmlUrl = resolveFxml("/App/blank-view.fxml");
         if (fxmlUrl == null) fxmlUrl = resolveFxml("/App/new-doc.fxml");
@@ -122,8 +122,7 @@ public class HelloController {
         // This is the key: we manually tell the loader how to build BlankController
         loader.setControllerFactory(type -> {
             if (type == BlankController.class) {
-                int siteID = Math.abs(userId.hashCode());
-                return new BlankController(docID, docName, viewCode, editCode, siteID, this.blockDLL, canEdit);
+                return new BlankController(docID, docName, viewCode, editCode, userId, this.blockDLL, canEdit);
             }
             try {
                 return type.getDeclaredConstructor().newInstance();
