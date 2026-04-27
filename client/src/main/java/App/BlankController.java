@@ -14,11 +14,14 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.Node;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Path;
 import javafx.scene.shape.Circle;
 import org.fxmisc.richtext.Caret;
 import org.fxmisc.richtext.CaretNode;
 import org.fxmisc.richtext.StyleClassedTextArea;
+import org.fxmisc.richtext.model.TwoDimensional;
 import org.fxmisc.richtext.model.RichTextChange;
 
 import java.net.URL;
@@ -126,11 +129,23 @@ public class BlankController implements Initializable {
 
         setupCodeLabels();
 
-        if (textArea != null) {
-            textArea.setStyle("-fx-caret-color: " + colorForSite(mySiteID) + ";");
-        }
+        updateLocalCaretColor();
 
         updateActiveUsersPanel();
+    }
+
+    private void updateLocalCaretColor() {
+        if (textArea == null) return;
+
+        String color = colorForSite(mySiteID);
+        textArea.setStyle("-fx-caret-color: " + color + ";");
+
+        javafx.application.Platform.runLater(() -> {
+            Node localCaret = textArea.lookup(".caret");
+            if (localCaret instanceof Path path) {
+                path.setStroke(Color.web(color));
+            }
+        });
     }
 
     private void updateRemoteCaretColor(int siteID) {
@@ -184,7 +199,7 @@ public class BlankController implements Initializable {
                     javafx.application.Platform.runLater(() -> {
                         try {
                             rerender(caretSnapshot);
-                            broadcastCursorPosition(textArea.getCaretPosition());
+                            broadcastCursorPosition(textArea.getCaretPosition(), true);
                         } finally {
                             isRemoteUpdate = previousRemoteFlag;
                         }
@@ -196,7 +211,7 @@ public class BlankController implements Initializable {
         textArea.caretPositionProperty().addListener((obs, oldVal, newVal) -> {
             updateLineCol();
             if (!isRemoteUpdate) {
-                broadcastCursorPosition(newVal.intValue());
+                broadcastCursorPosition(newVal.intValue(), false);
             }
         });
     }
@@ -258,9 +273,7 @@ public class BlankController implements Initializable {
             Integer prev = siteColorIndices.put(action.getSiteID(), action.getColorIndex());
             if (prev == null || prev != action.getColorIndex()) {
                 if (action.getSiteID() == mySiteID) {
-                    if (textArea != null) {
-                        textArea.setStyle("-fx-caret-color: " + colorForSite(mySiteID) + ";");
-                    }
+                    updateLocalCaretColor();
                 } else {
                     updateRemoteCaretColor(action.getSiteID());
                 }
@@ -331,9 +344,13 @@ public class BlankController implements Initializable {
 
     // 9. cursor broadcasting
     private void broadcastCursorPosition(int caretPos) {
+        broadcastCursorPosition(caretPos, false);
+    }
+
+    private void broadcastCursorPosition(int caretPos, boolean force) {
         if (wsService == null) return;
         long now = now();
-        if (now - lastCursorBroadcastMs < CURSOR_THROTTLE_MS) return;
+        if (!force && now - lastCursorBroadcastMs < CURSOR_THROTTLE_MS) return;
         lastCursorBroadcastMs = now;
 
         String charID = resolveCharIDForCaret(caretPos);
@@ -347,8 +364,10 @@ public class BlankController implements Initializable {
 
     private String resolveCharIDForCaret(int caretPos) {
         if (visibleNodes.isEmpty()) return getSeedHeadID();
-        int clamped = Math.min(caretPos, visibleNodes.size() - 1);
-        return visibleNodes.get(clamped).getCharID();
+        if (caretPos <= 0) return getSeedHeadID();
+
+        int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
+        return visibleNodes.get(anchorIndex).getCharID();
     }
 
     // 10. rendering
@@ -398,7 +417,10 @@ public class BlankController implements Initializable {
             }
 
             CaretNode caret = remoteCarets.computeIfAbsent(siteID, this::createRemoteCaret);
-            caret.moveTo(Math.max(0, Math.min(position, textArea.getLength())));
+            int clamped = Math.max(0, Math.min(position, textArea.getLength()));
+            TwoDimensional.Position areaPosition =
+                    textArea.offsetToPosition(clamped, TwoDimensional.Bias.Forward);
+            caret.moveTo(areaPosition.getMajor(), areaPosition.getMinor());
         }
     }
 
@@ -425,7 +447,7 @@ public class BlankController implements Initializable {
     private int resolveTextAreaIndexForCharID(String charID) {
         if (charID == null || charID.equals(getSeedHeadID())) return 0;
         for (int i = 0; i < visibleNodes.size(); i++) {
-            if (charID.equals(visibleNodes.get(i).getCharID())) return i;
+            if (charID.equals(visibleNodes.get(i).getCharID())) return i + 1;
         }
         return -1;
     }
@@ -533,26 +555,24 @@ public class BlankController implements Initializable {
     public void close() {
         try {
             if (wsService != null) {
-                // Build and send a DISCONNECT action so the server can broadcast it to other clients
-                long thisClock = ++clock;
                 long now = System.currentTimeMillis();
                 String userName = remoteUserNames.getOrDefault(mySiteID, "User-" + (mySiteID % 1000));
-                Action action = new Action(thisClock, now, mySiteID, docID, "DISCONNECT", null, null, userName);
+                Action cursorRemove = new Action(++clock, now, mySiteID, docID, "CURSOR_REMOVE", null, null, userName);
+                Action disconnect = new Action(++clock, now + 1, mySiteID, docID, "DISCONNECT", null, null, userName);
 
-                // mark as seen so we don't re-apply our own disconnect when it echoes back
-                seenActionIds.add(buildActionId(action));
+                seenActionIds.add(buildActionId(cursorRemove));
+                seenActionIds.add(buildActionId(disconnect));
 
-                // Attempt to send the action. If the session is disconnected this will enqueue it.
                 try {
-                    wsService.sendAction(action);
+                    wsService.sendAction(cursorRemove);
+                    wsService.sendAction(disconnect);
                 } catch (Exception e) {
-                    System.err.println("Failed to send DISCONNECT action: " + e.getMessage());
+                    System.err.println("Failed to send disconnect cleanup actions: " + e.getMessage());
                 }
 
-                // Give a short grace period for the disconnect message to be transmitted, then disconnect.
                 new Thread(() -> {
                     try {
-                        Thread.sleep(200); // 200ms
+                        Thread.sleep(400);
                     } catch (InterruptedException ignored) {}
                     try {
                         wsService.disconnect();
@@ -626,8 +646,24 @@ public class BlankController implements Initializable {
     }
 
     private int colorIndexForSite(int siteID) {
-        Integer idx = siteColorIndices.getOrDefault(siteID, Math.abs(siteID) % USER_COLORS.length);
-        return Math.max(0, Math.min(idx, USER_COLORS.length - 1));
+        Integer assigned = siteColorIndices.get(siteID);
+        if (assigned != null && assigned >= 0) {
+            return Math.max(0, Math.min(assigned, USER_COLORS.length - 1));
+        }
+
+        // Fallback: assign distinct colors deterministically from the currently
+        // visible set of collaborators so two users don't collapse to the same
+        // color just because their site IDs share the same modulo.
+        List<Integer> knownSites = new ArrayList<>(remoteCursorPositions.keySet());
+        knownSites.add(mySiteID);
+        knownSites.sort(Integer::compareTo);
+
+        int distinctIndex = knownSites.indexOf(siteID);
+        if (distinctIndex < 0) {
+            distinctIndex = Math.abs(siteID);
+        }
+
+        return distinctIndex % USER_COLORS.length;
     }
 
     // 17. utilities
