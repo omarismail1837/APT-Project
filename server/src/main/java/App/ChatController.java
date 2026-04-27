@@ -131,6 +131,10 @@ public class ChatController {
                 // For viewers, we still send the editCode so the UI can display it as "Hidden" or null
                 return "viewer:" + docId + ":" + name + ":" + info.editCode + ":" + info.viewCode;
             }
+
+            System.out.println(info.editors);
+            System.out.println(info.viewers);
+
         }
         return "invalid";
     }
