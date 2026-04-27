@@ -2,65 +2,71 @@
 
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.control.*?>
-<?import javafx.scene.shape.Circle?>
-<?import javafx.geometry.Insets?>
-
 <?import org.fxmisc.richtext.StyleClassedTextArea?>
+
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="App.BlankController"
-            prefWidth="900" prefHeight="600"
+            prefWidth="1000" prefHeight="700"
             style="-fx-background-color: #121212; -fx-padding: 15;">
 
     <center>
-        <VBox style="-fx-background-color: #1e1e1e; -fx-background-radius: 8; -fx-border-color: #333; -fx-border-radius: 8; -fx-border-width: 1;">
+        <VBox VBox.vgrow="ALWAYS" fillWidth="true" style="-fx-background-color: #1e1e1e; -fx-background-radius: 8; -fx-border-color: #333; -fx-border-radius: 8; -fx-border-width: 1;">
 
-            <HBox alignment="CENTER_LEFT" spacing="15" style="-fx-padding: 15; -fx-border-color: transparent transparent #333 transparent; -fx-border-width: 1;">
-                <Label fx:id="nameLabel" text="my-document.txt" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 14;"/>
+            <HBox alignment="CENTER_LEFT" spacing="15" style="-fx-padding: 10 20; -fx-border-color: transparent transparent #333 transparent; -fx-border-width: 1;">
 
-                <Label fx:id="docIdLabel" style="-fx-text-fill: #888; -fx-font-family: 'monospace'; -fx-font-size: 12;" />
-                <Label fx:id="sessionCodeLabel" style="-fx-text-fill: #4ade80; -fx-font-family: 'monospace'; -fx-font-size: 12;" />
-
-                <Separator orientation="VERTICAL" prefHeight="20" style="-fx-opacity: 0.2;"/>
-
-                <HBox spacing="5">
-                    <Button fx:id="boldButton"
-                            onAction="#toggleBold"
-                            text="B"
-                            styleClass="btn-format"
-                            style="-fx-background-color: #2a2a2a;
-                            -fx-text-fill: white;
-                            -fx-font-weight: bold;
-                            -fx-cursor: hand;"/>
-                    <Button fx:id="italicButton"
-                            onAction="#toggleItalic"
-                            text="I"
-                            styleClass="btn-format"
-                            style="-fx-background-color: #2a2a2a; -fx-text-fill: white; -fx-font-style: italic; -fx-cursor: hand;"/>
+                <HBox alignment="CENTER_LEFT" spacing="12" minWidth="310" prefWidth="340">
+                    <VBox alignment="CENTER_LEFT" minWidth="0">
+                        <Label fx:id="nameLabel" text="documents.txt" textOverrun="ELLIPSIS" maxWidth="330" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 13;"/>
+                        <Label fx:id="docIdLabel" maxWidth="330" style="-fx-text-fill: #666; -fx-font-family: 'monospace'; -fx-font-size: 10;" />
+                    </VBox>
                 </HBox>
 
-                <Region HBox.hgrow="ALWAYS" /> <HBox spacing="10">
-                <Button text="Export" style="-fx-background-color: transparent; -fx-border-color: #444; -fx-border-radius: 4; -fx-text-fill: #ccc;"/>
-                <Button text="Undo" style="-fx-background-color: transparent; -fx-border-color: #444; -fx-border-radius: 4; -fx-text-fill: #ccc;"/>
-                <Button text="Redo" style="-fx-background-color: transparent; -fx-border-color: #444; -fx-border-radius: 4; -fx-text-fill: #ccc;"/>
-            </HBox>
+                <Separator orientation="VERTICAL" prefHeight="25" style="-fx-opacity: 0.1;"/>
+
+                <VBox alignment="CENTER_LEFT" spacing="2" minWidth="210" HBox.hgrow="ALWAYS">
+                    <Label fx:id="editCodeLabel"
+                           textOverrun="ELLIPSIS"
+                           maxWidth="Infinity"
+                           style="-fx-text-fill: #4ade80; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
+                    <Label fx:id="viewCodeLabel"
+                           textOverrun="ELLIPSIS"
+                           maxWidth="Infinity"
+                           style="-fx-text-fill: #93c5fd; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
+                </VBox>
+
+                <Region HBox.hgrow="ALWAYS" />
+
+                <HBox spacing="10" alignment="CENTER_RIGHT" minWidth="260">
+                    <HBox spacing="4">
+                        <Button fx:id="boldButton" onAction="#toggleBold" text="B" styleClass="btn-format" style="-fx-font-weight: bold;"/>
+                        <Button fx:id="italicButton" onAction="#toggleItalic" text="I" styleClass="btn-format" style="-fx-font-style: italic;"/>
+                    </HBox>
+
+                    <Separator orientation="VERTICAL" prefHeight="20" style="-fx-opacity: 0.1;"/>
+
+                    <HBox spacing="6">
+                        <Button text="Undo" styleClass="btn-action"/>
+                        <Button text="Redo" styleClass="btn-action"/>
+                        <Button text="Export" styleClass="btn-action" style="-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-border-color: #2563eb;"/>
+                    </HBox>
+                </HBox>
             </HBox>
 
             <HBox VBox.vgrow="ALWAYS">
                 <StyleClassedTextArea fx:id="textArea" VBox.vgrow="ALWAYS" HBox.hgrow="ALWAYS"
-                          wrapText="true"
-                          style="-fx-control-inner-background: #1e1e1e; -fx-text-fill: #d4d4d4; -fx-display-caret: true; -fx-background-color: transparent; -fx-focus-color: transparent;
-                          -fx-text-box-border: transparent; -fx-font-family: 'ui-sans-serif'; -fx-font-size: 15;  -fx-prompt-text-fill: gray;"/>
+                                      wrapText="true"
+                                      styleClass="styled-text-area"/>
 
-                <VBox spacing="15" prefWidth="200" style="-fx-padding: 20; -fx-border-color: transparent transparent transparent #333; -fx-border-width: 1;">
-                    <Label text="ACTIVE USERS" style="-fx-text-fill: #888; -fx-font-size: 11; -fx-font-weight: bold; -fx-letter-spacing: 1;"/>
-
-                    <VBox fx:id="activeUsersBox" spacing="10"/>
+                <VBox prefWidth="220" spacing="15" style="-fx-padding: 20; -fx-border-color: transparent transparent transparent #333; -fx-border-width: 1; -fx-background-color: #1a1a1a;">
+                    <Label text="ACTIVE USERS" style="-fx-text-fill: #666; -fx-font-size: 10; -fx-font-weight: bold; -fx-letter-spacing: 1;"/>
+                    <VBox fx:id="activeUsersBox" spacing="12"/>
                 </VBox>
             </HBox>
 
-            <HBox spacing="20" style="-fx-padding: 8 15; -fx-background-color: #1a1a1a; -fx-background-radius: 0 0 8 8;">
-                <Label fx:id="lineColLabel" text="Line 3, Col 12" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
-                <Label fx:id="connectedLabel" text="2 editors connected" style="-fx-text-fill: #666; -fx-font-size: 11;"/>
+            <HBox spacing="20" alignment="CENTER_LEFT" style="-fx-padding: 8 15; -fx-background-color: #161616; -fx-background-radius: 0 0 8 8;">
+                <Label fx:id="lineColLabel" text="Line 1, Col 1" style="-fx-text-fill: #555; -fx-font-size: 11;"/>
+                <Region HBox.hgrow="ALWAYS" />
+                <Label fx:id="connectedLabel" text="1 editors connected" style="-fx-text-fill: #555; -fx-font-size: 11;"/>
             </HBox>
         </VBox>
     </center>

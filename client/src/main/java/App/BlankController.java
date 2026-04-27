@@ -11,6 +11,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.IndexRange;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -98,7 +99,8 @@ public class BlankController implements Initializable {
     @FXML private Label docIdLabel;
     @FXML private Label lineColLabel;
     @FXML private Label connectedLabel;
-    @FXML private Label sessionCodeLabel; // Add this for displaying the code
+    @FXML private Label editCodeLabel;
+    @FXML private Label viewCodeLabel;
 
 
     // 5. init (separated initialise into functions for readability)
@@ -118,14 +120,7 @@ public class BlankController implements Initializable {
         if (docIdLabel != null)     docIdLabel.setText(docID);
         if (textArea != null)       textArea.setEditable(canEdit);
 
-        if (sessionCodeLabel != null) {
-            if (canEdit) {
-                String view = (viewCode != null && !viewCode.isBlank()) ? viewCode : "(unavailable)";
-                sessionCodeLabel.setText("Edit: " + editCode + "  |  View: " + view);
-            } else {
-                sessionCodeLabel.setText("View only");
-            }
-        }
+        setupCodeLabels();
 
         // Color own caret to match our assigned color
         if (textArea != null) {
@@ -133,6 +128,22 @@ public class BlankController implements Initializable {
         }
 
         updateActiveUsersPanel();
+    }
+
+    private void setupCodeLabels() {
+        String edit = (editCode != null && !editCode.isBlank()) ? editCode : "(unavailable)";
+        String view = (viewCode != null && !viewCode.isBlank()) ? viewCode : "(unavailable)";
+
+        if (editCodeLabel != null) {
+            editCodeLabel.setText(canEdit ? "Edit: " + edit : "View only");
+            editCodeLabel.setTooltip(new Tooltip(canEdit ? "Edit code: " + edit : "View only"));
+        }
+
+        if (viewCodeLabel != null) {
+            viewCodeLabel.setText("View: " + view);
+            viewCodeLabel.setTooltip(new Tooltip("View code: " + view));
+        }
+
     }
 
     private void setupWebSocket() {

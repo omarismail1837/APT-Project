@@ -1,19 +1,65 @@
 .styled-text-area {
     -fx-background-color: #1e1e1e;
-    -fx-padding: 16;
-    -fx-font-family: "Segoe UI", "System";
+    -fx-padding: 30;
+    -fx-font-family: "Consolas", "Monaco", monospace;
     -fx-font-size: 15px;
     -fx-line-spacing: 6;
-}
-
-.styled-text-area .text {
-    -fx-fill: #e6e6e6;
-    -fx-font-family: "Segoe UI", "System";
 }
 
 .styled-text-area .content {
     -fx-background-color: #1e1e1e;
 }
+
+.btn-format {
+    -fx-background-color: #2a2a2a;
+    -fx-text-fill: #e6e6e6;
+    -fx-min-width: 32px;
+    -fx-pref-width: 32px;
+    -fx-min-height: 32px;
+    -fx-background-radius: 10;
+    -fx-border-color: #444;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 10;
+    -fx-cursor: hand;
+}
+
+.btn-format:hover {
+    -fx-background-color: #333;
+    -fx-border-color: #666;
+}
+
+.btn-action {
+    -fx-background-color: #2a2a2a;
+    -fx-text-fill: #ccc;
+    -fx-padding: 5 12;
+    -fx-min-width: 60px; /* Prevents "..." */
+    -fx-font-size: 12px;
+    -fx-background-radius: 10;
+    -fx-border-color: #444;
+    -fx-border-radius: 10;
+    -fx-cursor: hand;
+}
+
+.btn-action:hover {
+    -fx-background-color: #333;
+}
+
+.btn-nav {
+    -fx-background-color: transparent;
+    -fx-border-color: #444;
+    -fx-text-fill: #888;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 4 10;
+    -fx-cursor: hand;
+}
+
+.btn-nav:hover {
+    -fx-text-fill: white;
+    -fx-border-color: #666;
+}
+
+
 
 .bold {
     -fx-font-family: "Segoe UI", "System";
@@ -69,28 +115,4 @@
 
 .styled-text-area > .caret {
     -fx-stroke: #3b82f6;
-}
-
-.btn-format {
-    -fx-background-color: #2a2a2a;
-    -fx-text-fill: #e6e6e6;
-    -fx-font-family: "Segoe UI", "System";
-    -fx-font-size: 13px;
-    -fx-background-radius: 6;
-    -fx-border-color: #444444;
-    -fx-border-width: 0.5;
-    -fx-border-radius: 6;
-    -fx-padding: 4 14 4 14;
-    -fx-cursor: hand;
-}
-
-.btn-format:hover {
-    -fx-background-color: #333333;
-    -fx-border-color: #666666;
-}
-
-.btn-format:pressed {
-    -fx-background-color: #3d3d3d;
-    -fx-border-color: #888888;
-    -fx-text-fill: #ffffff;
 }
