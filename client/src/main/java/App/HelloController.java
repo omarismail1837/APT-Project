@@ -5,11 +5,9 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.json.JSONObject;
 
@@ -30,12 +28,7 @@ public class HelloController {
 
     @FXML private Button newDocButton;
     @FXML private Button joinButton;
-    @FXML private Button showSignupButton;
-    @FXML private Button showLoginButton;
-    @FXML private Button backToSessionButton;
-    @FXML private Button backFromLoginButton;
-    @FXML private Button createAccountButton;
-    @FXML private Button loginAccountButton;
+    @FXML private Button importButton;
     @FXML private TextField sessionCodeField;
     @FXML private TextField newDocNameField;
     @FXML private TextField signupNameField;
@@ -84,7 +77,7 @@ public class HelloController {
             HttpURLConnection conn = (HttpURLConnection) new URL(joinUrl).openConnection();
 
             // 4. Process the session (this will extract the role and move to the editor)
-            processSession(conn, newDocButton, nameInput);
+            processSession(conn, newDocButton, nameInput, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -102,13 +95,14 @@ public class HelloController {
             HttpURLConnection conn = (HttpURLConnection) new URL(urlString).openConnection();
 
             // Use the same processSession method for joining (no provided doc name)
-            processSession(conn, joinButton, null);
+            processSession(conn, joinButton, null, null);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void processSession(HttpURLConnection conn, Button sourceButton, String providedDocName) throws Exception {
+    private void processSession(HttpURLConnection conn, Button sourceButton,
+                                String providedDocName, String importContent) throws Exception {
         if (conn.getResponseCode() == 200) {
             String raw = readResponse(conn).trim();
             if (raw.equals("invalid")) {
@@ -129,11 +123,13 @@ public class HelloController {
             String finalEditCode = "null".equals(serverEditCode) ? null : serverEditCode;
 
             // Call loader with the correct order of arguments
-            loadEditorScene(actualDocId, docName, viewCode, finalEditCode, canEdit, userId, sourceButton);
+            loadEditorScene(actualDocId, docName, viewCode, finalEditCode, canEdit, userId, sourceButton, importContent);
         }
     }
 
-    private void loadEditorScene(String docID, String docName, String viewCode, String editCode, boolean canEdit, int userId, Button sourceButton) throws IOException {
+    private void loadEditorScene(String docID, String docName, String viewCode, String editCode,
+                                 boolean canEdit, int userId, Button sourceButton,
+                                 String importContent) throws IOException {
         // Ensure you use the correct FXML name (blank-view.fxml or new-doc.fxml)
         URL fxmlUrl = resolveFxml("/App/blank-view.fxml");
         if (fxmlUrl == null) fxmlUrl = resolveFxml("/App/new-doc.fxml");
@@ -153,6 +149,14 @@ public class HelloController {
         });
 
         Parent root = loader.load();
+        Object controller = loader.getController();
+
+        // after loading, add importContent if not null
+        if (importContent != null && controller instanceof BlankController)
+        {
+            BlankController bc = (BlankController) controller;
+            javafx.application.Platform.runLater(() -> bc.insertImportedText(importContent));
+        }
         Scene scene = new Scene(root);
 
         URL cssUrl = HelloApplication.class.getResource("/App/editor.css");
@@ -161,7 +165,6 @@ public class HelloController {
         Stage stage = (Stage) sourceButton.getScene().getWindow();
 
         // Make sure the BlankController gets a chance to cleanup (disconnect websocket)
-        Object controller = loader.getController();
         if (controller instanceof BlankController) {
             BlankController bc = (BlankController) controller;
             stage.setOnCloseRequest(evt -> {
@@ -300,6 +303,58 @@ public class HelloController {
         setLoginStatus("Login profile loaded locally. Session tools are ready.");
         showSessionPane();
     }
+
+    @FXML
+    private void importDoc()
+    {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Import document");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text files", "*.txt"));
+
+        java.io.File file = chooser.showOpenDialog(null); // opens the picker
+        if (file == null) return; // user cancelled
+
+        String content;
+        try {
+            content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            showImportAlert(Alert.AlertType.ERROR, "Import failed", "Could not read the text file.");
+            return;
+        }
+
+        String filename = file.getName();
+        newDocFromImport(filename, content);
+    }
+
+    private void showImportAlert(Alert.AlertType type, String title, String message) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    // same as newdoc except name is given
+    private void newDocFromImport(String fname, String content) {
+        try {
+            // 1. Create a unique ID for the document
+            String docId = UUID.randomUUID().toString();
+
+            // 2. Register it on the server and get the generated codes
+            SessionInfo sessionInfo = getCodesFromServer(docId, fname);
+
+            String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code=" +
+                    sessionInfo.editCode + "&userId=" + userId;
+
+            HttpURLConnection conn = (HttpURLConnection) new URL(joinUrl).openConnection();
+
+            // 4. Process the session (this will extract the role and move to the editor)
+            processSession(conn, newDocButton, fname, content);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 
     private void setSignupStatus(String message) {
         if (signupStatusLabel != null) {

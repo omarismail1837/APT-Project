@@ -200,4 +200,10 @@ public class BlankController implements Initializable {
     public void setDocID(String docID) {
         this.docID = docID;
     }
+
+    public void insertImportedText(String c)
+    {
+        if (c == null || c.isBlank()) return;
+        textArea.replaceText(c);
+    }
 }

@@ -40,6 +40,12 @@
                                 minWidth="120"/>
                     </HBox>
 
+                    <Button fx:id="importButton"
+                            text="Import document (.txt)"
+                            onAction="#importDoc"
+                            styleClass="btn-secondary"
+                            maxWidth="Infinity"/>
+
                     <Button text="Browse documents"
                             styleClass="btn-secondary"
                             maxWidth="Infinity"/>
