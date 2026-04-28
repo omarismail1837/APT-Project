@@ -2,50 +2,55 @@ package App;
 
 import App.crdt.action.Action;
 import App.crdt.block.BlockDLL;
-import App.crdt.block.BlockNode;
-import App.crdt.character.CharDLL;
-import App.crdt.character.CharNode;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.IndexRange;
 import javafx.scene.control.Label;
-import javafx.scene.control.Tooltip;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.Node;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Path;
-import javafx.scene.shape.Circle;
-import javafx.stage.FileChooser;
-import javafx.stage.Window;
-import org.fxmisc.richtext.Caret;
-import org.fxmisc.richtext.CaretNode;
 import org.fxmisc.richtext.StyleClassedTextArea;
-import org.fxmisc.richtext.model.TwoDimensional;
-import org.fxmisc.richtext.model.RichTextChange;
 
-import java.io.IOException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.*;
+import java.util.HashSet;
+import java.util.ResourceBundle;
+import java.util.Set;
 
-// Responsible for:
-// listening to what user types & translating the keystrokes to CRDT OPs
-// send those ops to the server via websocket
-// recv ops from other users via websocket & apply to doc
 public class BlankController implements Initializable {
 
-    // 1. constants
-    private static final String[] USER_COLORS = {"#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"};
-    private static final long CURSOR_THROTTLE_MS = 80; // min ms between cursor broadcasts
-    private static final int MAX_REMOTE_USERS = 3;
+    static final String[] USER_COLORS = {"#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"};
+    static final long CURSOR_THROTTLE_MS = 80;
+    static final int MAX_REMOTE_USERS = 3;
+    static final String WS_URL = "https://apt-project-production-326d.up.railway.app/ws-connect";
 
+    private final int mySiteID;
+    private final String docName;
+    private final BlockDLL blockDLL;
 
-    // 2. constructor and fields
+    private long clock = 0;
+    private String docID;
+    private final boolean canEdit;
+    private final String editCode;
+    private final String viewCode;
+
+    private WebSocketService wsService;
+    private final Set<String> seenActionIds = new HashSet<>();
+    private boolean isRemoteUpdate = false;
+
+    private final EditorDocumentController documentController;
+    private final PresenceController presenceController;
+    private final SessionSyncController sessionSyncController;
+
+    @FXML Label nameLabel;
+    @FXML VBox activeUsersBox;
+    @FXML StyleClassedTextArea textArea;
+    @FXML Button boldButton;
+    @FXML Button italicButton;
+    @FXML Button exportButton;
+    @FXML Label docIdLabel;
+    @FXML Label lineColLabel;
+    @FXML Label connectedLabel;
+    @FXML Label editCodeLabel;
+    @FXML Label viewCodeLabel;
+
     public BlankController(String docID, String docName, String viewCode, String editCode,
                            int mySiteID, BlockDLL blockDLL, boolean canEdit) {
         this.docID = docID;
@@ -55,110 +60,34 @@ public class BlankController implements Initializable {
         this.blockDLL = blockDLL;
         this.canEdit = canEdit;
         this.docName = docName;
+
+        this.documentController = new EditorDocumentController(this);
+        this.presenceController = new PresenceController(this, documentController);
+        this.sessionSyncController = new SessionSyncController(this, documentController, presenceController);
     }
 
-    // convenience constructor for offline testing
     public BlankController(BlockDLL blockDLL) {
-        // Chains to the main constructor with placeholder values
         this("local-doc", "N/A", "N/A", null, 0, blockDLL, true);
     }
 
-    // identity
-    private final int mySiteID;
-    private final String docName;
-    private long clock = 0;
-    private String docID;
-    private boolean canEdit = true;
-    private String editCode; // Store the code
-    private String viewCode; // Store the view code if available
-
-    // crdt
-    private final BlockDLL blockDLL;
-
-    // flat lst of all visible characters in order
-    // used to map a cursor position in the TextArea to an actual character in the CRDT
-    private final ArrayList<CharNode> visibleNodes = new ArrayList<>();
-
-
-    // websocket
-    private WebSocketService wsService;
-
-    // server broadcasts my own edits to everyone including me
-    // prevent applying my own edit twice via this hashset
-    private final Set<String> seenActionIds = new HashSet<>();
-
-    // when true, the text change listener ignores the change so it doesnt lead to an infinite loop
-    private boolean isRemoteUpdate = false;
-
-    // 3. cursor tracking
-
-    // siteID -> charID the cursor sits before
-    private final Map<Integer, String> remoteCursorPositions = new LinkedHashMap<>();
-    // siteID -> display name
-    private final Map<Integer, String> remoteUserNames = new LinkedHashMap<>();
-    // siteID -> visual caret in the editor
-    private final Map<Integer, CaretNode> remoteCarets = new HashMap<>();
-    // siteID -> color index (0-3), assigned by server via Action.colorIndex
-    private final Map<Integer, Integer> siteColorIndices = new HashMap<>();
-    private long lastCursorBroadcastMs = 0;
-
-
-    // 4. fxml bindings
-    @FXML private Label nameLabel;
-    @FXML private VBox activeUsersBox;
-    @FXML private StyleClassedTextArea textArea;
-    @FXML private Button boldButton;
-    @FXML private Button italicButton;
-    @FXML private Button exportButton;
-    @FXML private Label docIdLabel;
-    @FXML private Label lineColLabel;
-    @FXML private Label connectedLabel;
-    @FXML private Label editCodeLabel;
-    @FXML private Label viewCodeLabel;
-
-
-    // 5. init (separated initialise into functions for readability)
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        ensureSeedBlock();
-        refreshMapping();
-
-        setUpTextAreaListener();
-        setupCaretListener();
+        documentController.initializeDocument();
+        documentController.setupTextAreaListener();
+        presenceController.setupCaretListener();
         setupUI();
-        setupWebSocket();
+        sessionSyncController.setupWebSocket();
     }
 
     private void setupUI() {
-        if (nameLabel != null)      nameLabel.setText(docName + ".txt");
-        if (docIdLabel != null)     docIdLabel.setText(docID);
-        if (textArea != null)       textArea.setEditable(canEdit);
+        if (nameLabel != null) nameLabel.setText(docName + ".txt");
+        if (docIdLabel != null) docIdLabel.setText(docID);
+        if (textArea != null) textArea.setEditable(canEdit);
 
         setupCodeLabels();
-
-        updateLocalCaretColor();
-
-        updateActiveUsersPanel();
-    }
-
-    private void updateLocalCaretColor() {
-        if (textArea == null) return;
-
-        String color = colorForSite(mySiteID);
-        textArea.setStyle("-fx-caret-color: " + color + ";");
-
-        javafx.application.Platform.runLater(() -> {
-            Node localCaret = textArea.lookup(".caret");
-            if (localCaret instanceof Path path) {
-                path.setStroke(Color.web(color));
-            }
-        });
-    }
-
-    private void updateRemoteCaretColor(int siteID) {
-        CaretNode caret = remoteCarets.get(siteID);
-        if (caret == null) return;
-        caret.setStroke(Color.web(colorForSite(siteID)));
+        presenceController.updateLocalCaretColor();
+        presenceController.updateActiveUsersPanel();
+        presenceController.updateLineCol();
     }
 
     private void setupCodeLabels() {
@@ -167,593 +96,108 @@ public class BlankController implements Initializable {
 
         if (editCodeLabel != null) {
             editCodeLabel.setText(canEdit ? "Edit: " + edit : "View only");
-            editCodeLabel.setTooltip(new Tooltip(canEdit ? "Edit code: " + edit : "View only"));
+            editCodeLabel.setTooltip(new javafx.scene.control.Tooltip(canEdit ? "Edit code: " + edit : "View only"));
         }
 
         if (viewCodeLabel != null) {
             viewCodeLabel.setText("View: " + view);
-            viewCodeLabel.setTooltip(new Tooltip("View code: " + view));
-        }
-
-    }
-
-    private void setupWebSocket() {
-        wsService = new WebSocketService(
-                docID,
-                action -> javafx.application.Platform.runLater(() -> handleRemoteAction(action)),
-                () -> javafx.application.Platform.runLater(() -> broadcastCursorPosition(textArea.getCaretPosition()))
-        );
-
-        wsService.setOnDisconnected(() -> javafx.application.Platform.runLater(() -> {
-            if (connectedLabel != null) connectedLabel.setText("Disconnected");
-        }));
-
-        wsService.connect("https://apt-project-production-326d.up.railway.app/ws-connect");
-    }
-
-    // 6. text area listeners
-    // UnaryOperator<TextFormatter.Change> means a function that takes a change and returns a change
-    // return change object to apply it and null to cancel the change
-    private void setUpTextAreaListener() {
-        textArea.multiRichChanges()
-                .filter(changes -> !isRemoteUpdate)
-                .subscribe(changes -> {
-                    changes.forEach(change -> processRichChange(change));
-                    int caretSnapshot = textArea.getCaretPosition();
-
-                    boolean previousRemoteFlag = isRemoteUpdate;
-                    isRemoteUpdate = true;
-                    javafx.application.Platform.runLater(() -> {
-                        try {
-                            rerender(caretSnapshot);
-                            broadcastCursorPosition(textArea.getCaretPosition(), true);
-                        } finally {
-                            isRemoteUpdate = previousRemoteFlag;
-                        }
-                    });
-                });
-    }
-
-    private void setupCaretListener() {
-        textArea.caretPositionProperty().addListener((obs, oldVal, newVal) -> {
-            updateLineCol();
-            if (!isRemoteUpdate) {
-                broadcastCursorPosition(newVal.intValue(), false);
-            }
-        });
-    }
-
-    // 7. local edits processing
-    private void processRichChange(RichTextChange<?, ?, ?> change) {
-        int idx = change.getPosition();
-
-        // delete first to handle selecting & typing at once
-        if (!change.getRemoved().getText().isEmpty()) {
-            int deleteCount = change.getRemoved().getText().length();
-            List<CharNode> snapshot = new ArrayList<>(visibleNodes); // stable indices during loop
-
-            for (int i = 0; i < deleteCount; i++) {
-                int targetIdx = idx + i;
-                if (targetIdx >= snapshot.size()) break;
-
-                Action action = new Action(++clock, now(), mySiteID, docID,
-                        "DELETE", snapshot.get(targetIdx).getCharID(), null, null);
-                applyAndSend(action);
-            }
-            refreshMapping();
-        }
-
-        // insert
-        if (!change.getInserted().getText().isEmpty()) {
-            String seedID = getSeedHeadID();
-            if (seedID == null) return;
-
-            String parentID = resolveParentIDForInsert(idx, seedID);
-            String text = change.getInserted().getText();
-
-            for (int i = 0; i < text.length(); i++) {
-                Action action = new Action(++clock, now(), mySiteID, docID,
-                        "INSERT", parentID, null, String.valueOf(text.charAt(i)));
-                applyAndSend(action);
-                refreshMapping();
-                parentID = resolveInsertedCharID(clock); // chain parent for next char
-            }
+            viewCodeLabel.setTooltip(new javafx.scene.control.Tooltip("View code: " + view));
         }
     }
 
-    // apply action to local crdt, mark as seen, and send over websocket
-    private void applyAndSend(Action action) {
-        blockDLL.applyAction(action);
-        seenActionIds.add(buildActionId(action));
-        if (wsService != null) {
-            wsService.sendAction(action);
-        }
-    }
-
-    // 8. remote action handlers
-    public void handleRemoteAction(Action action) {
-        if (action == null) return;
-        if (!docID.equals(action.getDocumentId())) return;
-
-        // Track color assignment from server
-        if (action.getColorIndex() >= 0) {
-            Integer prev = siteColorIndices.put(action.getSiteID(), action.getColorIndex());
-            if (prev == null || prev != action.getColorIndex()) {
-                if (action.getSiteID() == mySiteID) {
-                    updateLocalCaretColor();
-                } else {
-                    updateRemoteCaretColor(action.getSiteID());
-                }
-                withRemoteFlag(this::updateActiveUsersPanel);
-            }
-        }
-
-        String type = action.getActionType();
-
-        // cursor update (NOT a document edit)
-        if ("CURSOR".equals(type)) {
-            handleRemoteCursor(action);
-            return;
-        }
-
-        // user disconnect
-        if ("DISCONNECT".equals(type)) {
-            handleRemoteDisconnect(action);
-            return;
-        }
-
-        // cursor remove
-        if ("CURSOR_REMOVE".equals(type)) {
-            int siteID = action.getSiteID();
-            remoteCursorPositions.remove(siteID);
-            remoteUserNames.remove(siteID);
-            removeRemoteCaret(siteID);
-            withRemoteFlag(this::refreshUI);
-            return;
-        }
-
-        // document edit
-        if ("INSERT".equals(type)
-                || "DELETE".equals(type)
-                || "BOLD".equals(type)
-                || "ITALIC".equals(type)) {
-
-            String actionId = buildActionId(action);
-            if (seenActionIds.contains(actionId)) return;
-
-            seenActionIds.add(actionId);
-
-            blockDLL.applyAction(action);
-            rerender(textArea.getCaretPosition());
-        }    }
-
-    private void handleRemoteCursor(Action action) {
-        int siteID = action.getSiteID();
-        if (siteID == mySiteID) return; // ignore echoes of our own cursor
-
-        // update cursor position
-        remoteCursorPositions.put(siteID, action.getStartCharID());
-
-        // update display name if included
-        String extra = action.getExtraData();
-        if (extra != null && !extra.isBlank()) {
-            remoteUserNames.put(siteID, extra);
-        } else {
-            remoteUserNames.putIfAbsent(siteID, "User-" + Math.abs(siteID % 1000));
-        }
-
-        withRemoteFlag(this::refreshUI);
-    }
-
-    private void handleRemoteDisconnect(Action action) {
-        int siteID = action.getSiteID();
-        if (siteID == mySiteID) return;
-
-        remoteCursorPositions.remove(siteID);
-        remoteUserNames.remove(siteID);
-        removeRemoteCaret(siteID);
-        withRemoteFlag(this::refreshUI);
-    }
-
-    // 9. cursor broadcasting
-    private void broadcastCursorPosition(int caretPos) {
-        broadcastCursorPosition(caretPos, false);
-    }
-
-    private void broadcastCursorPosition(int caretPos, boolean force) {
-        if (wsService == null) return;
-        long now = now();
-        if (!force && now - lastCursorBroadcastMs < CURSOR_THROTTLE_MS) return;
-        lastCursorBroadcastMs = now;
-
-        String charID = resolveCharIDForCaret(caretPos);
-        if (charID == null) return;
-
-        Action action = new Action(++clock, now, mySiteID, docID,
-                "CURSOR", charID, null, "User-" + (mySiteID % 1000));
-//        seenActionIds.add(buildActionId(action));
-        wsService.sendAction(action);
-    }
-
-    private String resolveCharIDForCaret(int caretPos) {
-        if (visibleNodes.isEmpty()) return getSeedHeadID();
-        if (caretPos <= 0) return getSeedHeadID();
-
-        int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
-        return visibleNodes.get(anchorIndex).getCharID();
-    }
-
-    // 10. rendering
-    // full re-render: rebuild text from CRDT, apply formatting styles, then reposition remote carets.
-    private void rerender(int preferredCaret) {
-        withRemoteFlag(() -> {
-            refreshMapping();
-            textArea.replaceText(blockDLL.collectText());
-            applyStyles();
-
-            int safeCaret = Math.max(0, Math.min(preferredCaret, textArea.getLength()));
-            textArea.selectRange(safeCaret, safeCaret);
-
-            javafx.application.Platform.runLater(this::updateRemoteCarets);});
-    }
-
-    // applies bold/italic styles to every visible character
-    private void applyStyles() {
-        int docLength = textArea.getLength();
-        for (int i = 0; i < visibleNodes.size() && i < docLength; i++) {
-            CharNode c = visibleNodes.get(i);
-
-            // base formatting class
-            String baseClass = resolveBaseClass(c);
-
-            textArea.setStyleClass(i, i + 1, baseClass);
-        }
-    }
-
-    private void updateRemoteCarets() {
-        if (textArea == null) return;
-
-        for (Integer siteID : new ArrayList<>(remoteCarets.keySet())) {
-            if (!remoteCursorPositions.containsKey(siteID)) {
-                removeRemoteCaret(siteID);
-            }
-        }
-
-        for (Map.Entry<Integer, String> entry : remoteCursorPositions.entrySet()) {
-            int siteID = entry.getKey();
-            if (siteID == mySiteID) continue;
-
-            int position = resolveTextAreaIndexForCharID(entry.getValue());
-//            if (position < 0) {
-//                removeRemoteCaret(siteID);
-//                continue;
-//            }
-
-            CaretNode caret = remoteCarets.computeIfAbsent(siteID, this::createRemoteCaret);
-            int clamped = Math.max(0, Math.min(position, textArea.getLength()));
-            TwoDimensional.Position areaPosition =
-                    textArea.offsetToPosition(clamped, TwoDimensional.Bias.Forward);
-            caret.moveTo(areaPosition.getMajor(), areaPosition.getMinor());
-        }
-    }
-
-    private CaretNode createRemoteCaret(int siteID) {
-        CaretNode caret = new CaretNode("remote-caret-" + siteID, textArea);
-        caret.setShowCaret(Caret.CaretVisibility.ON);
-        caret.setStroke(Color.web(colorForSite(siteID)));
-        caret.setStrokeWidth(2);
-        caret.setManaged(false);
-        caret.setMouseTransparent(true);
-        caret.setFocusTraversable(false);
-        textArea.addCaret(caret);
-        return caret;
-    }
-
-    private void removeRemoteCaret(int siteID) {
-        CaretNode caret = remoteCarets.remove(siteID);
-        if (caret == null || textArea == null) return;
-
-        textArea.removeCaret(caret);
-        caret.dispose();
-    }
-
-    private int resolveTextAreaIndexForCharID(String charID) {
-        if (charID == null || charID.equals(getSeedHeadID())) {
-            return 0;
-        }
-
-        for (int i = 0; i < visibleNodes.size(); i++) {
-            if (charID.equals(visibleNodes.get(i).getCharID())) {
-                return i + 1;
-            }
-        }
-
-        // anchor vanished -> place at end
-        return textArea.getLength();
-    }
-
-    private String resolveBaseClass(CharNode c) {
-        if (c.getBold() && c.getItalic()) return "bold-italic";
-        if (c.getBold())   return "bold";
-        if (c.getItalic()) return "italic";
-        return "regular";
-    }
-
-    // refreshes only the users panel and remote carets, without replacing text
-    private void refreshUI() {
-        updateActiveUsersPanel();
-        applyStyles();
-        updateRemoteCarets();
-    }
-
-    // 11. formatting actions
     @FXML
     private void toggleBold() {
-        applyFormattingAction("BOLD", CharNode::getBold);
+        documentController.toggleBold();
     }
 
     @FXML
     private void toggleItalic() {
-        applyFormattingAction("ITALIC", CharNode::getItalic);
+        documentController.toggleItalic();
     }
 
     @FXML
     private void exportDocument() {
-        Window window = textArea != null && textArea.getScene() != null ? textArea.getScene().getWindow() : null;
-        if (window == null) {
-            showExportAlert(Alert.AlertType.ERROR, "Export failed", "The save dialog could not be opened.");
-            return;
-        }
-
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Export document");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text files", "*.txt"));
-        chooser.setInitialFileName(defaultExportFileName());
-
-        java.nio.file.Path targetPath = null;
-        try {
-            java.io.File selectedFile = chooser.showSaveDialog(window);
-            if (selectedFile == null) return;
-
-            targetPath = selectedFile.toPath();
-            Files.writeString(targetPath, blockDLL.collectText(), StandardCharsets.UTF_8);
-        } catch (IOException ex) {
-            showExportAlert(Alert.AlertType.ERROR, "Export failed", "Could not save the text file.");
-            return;
-        }
-
-        showExportAlert(Alert.AlertType.INFORMATION, "Export complete",
-                "Saved " + targetPath.getFileName() + " to your computer.");
+        documentController.exportDocument();
     }
 
-    private void applyFormattingAction(String type, java.util.function.Function<CharNode, Boolean> getter) {
-        IndexRange sel = textArea.getSelection();
-        if (sel.getLength() == 0) return;
-
-        int S = sel.getStart();
-        int E = sel.getEnd() - 1;
-        if (S < 0 || E >= visibleNodes.size()) return;
-
-        // Toggle: if ALL chars in range already have the style, remove it; otherwise apply
-        boolean allStyled = true;
-        for (int i = S; i <= E; i++) {
-            if (!getter.apply(visibleNodes.get(i))) { allStyled = false; break; }
-        }
-
-        Action action = new Action(++clock, now(), mySiteID, docID,
-                type,
-                visibleNodes.get(S).getCharID(),
-                visibleNodes.get(E).getCharID(),
-                allStyled ? "false" : "true");
-
-        applyAndSend(action);
-        rerender(textArea.getCaretPosition());
-    }
-
-    private String defaultExportFileName() {
-        String baseName = (docName == null || docName.isBlank()) ? "document" : docName.trim();
-        if (baseName.toLowerCase(Locale.ROOT).endsWith(".txt")) {
-            return baseName;
-        }
-        return baseName + ".txt";
-    }
-
-    private void showExportAlert(Alert.AlertType type, String title, String message) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        if (textArea != null && textArea.getScene() != null) {
-            alert.initOwner(textArea.getScene().getWindow());
-        }
-        alert.showAndWait();
-    }
-
-    // 12. active users panel
-    private void updateActiveUsersPanel() {
-        if (activeUsersBox == null) return;
-
-        activeUsersBox.getChildren().clear();
-
-        // always show ourselves first
-        activeUsersBox.getChildren().add(makeUserRow("You", colorForSite(mySiteID)));
-
-        // show up to MAX_REMOTE_USERS others
-        List<Integer> activeSites = new ArrayList<>(remoteCursorPositions.keySet());
-        Collections.sort(activeSites);
-        activeSites.stream()
-                .limit(MAX_REMOTE_USERS)
-                .forEach(siteID -> {
-                    String name = remoteUserNames.getOrDefault(siteID, "User-" + Math.abs(siteID % 1000));
-                    activeUsersBox.getChildren().add(makeUserRow(name, colorForSite(siteID)));
-                });
-
-        if (connectedLabel != null) {
-            connectedLabel.setText((1 + Math.min(activeSites.size(), MAX_REMOTE_USERS)) + " editors connected");
-        }
-    }
-
-    private HBox makeUserRow(String name, String color) {
-        Circle dot = new Circle(4);
-        dot.setFill(Color.web(color));
-        Label label = new Label(name);
-        label.setStyle("-fx-text-fill: #e0e0e0;");
-        HBox row = new HBox(10, dot, label);
-        row.setAlignment(Pos.CENTER_LEFT);
-        return row;
-    }
-
-    // 13. status bar
-    private void updateLineCol() {
-        if (lineColLabel == null) return;
-        int caretPos = textArea.getCaretPosition();
-        String text = textArea.getText();
-        int line = 1, col = 1;
-        for (int i = 0; i < caretPos && i < text.length(); i++) {
-            if (text.charAt(i) == '\n') { line++; col = 1; } else { col++; }
-        }
-        lineColLabel.setText("Line " + line + ", Col " + col);
-    }
-
-    // 14. cleanup
-    /**
-     * Gracefully close resources associated with this controller.
-     * Call this when the window is closed to ensure the websocket disconnects.
-     */
     public void close() {
-        try {
-            if (wsService != null) {
-                long now = System.currentTimeMillis();
-                String userName = remoteUserNames.getOrDefault(mySiteID, "User-" + (mySiteID % 1000));
-                Action cursorRemove = new Action(++clock, now, mySiteID, docID, "CURSOR_REMOVE", null, null, userName);
-                Action disconnect = new Action(++clock, now + 1, mySiteID, docID, "DISCONNECT", null, null, userName);
-
-//                seenActionIds.add(buildActionId(cursorRemove));
-//                seenActionIds.add(buildActionId(disconnect));
-
-                try {
-                    wsService.sendAction(cursorRemove);
-                    wsService.sendAction(disconnect);
-                } catch (Exception e) {
-                    System.err.println("Failed to send disconnect cleanup actions: " + e.getMessage());
-                }
-
-                new Thread(() -> {
-                    try {
-                        Thread.sleep(400);
-                    } catch (InterruptedException ignored) {}
-                    try {
-                        wsService.disconnect();
-                    } catch (Exception ex) {
-                        System.err.println("Error while disconnecting WS: " + ex.getMessage());
-                    }
-                }, "ws-disconnect-thread").start();
-            }
-            new ArrayList<>(remoteCarets.keySet()).forEach(this::removeRemoteCaret);
-        } catch (Exception ex) {
-            System.err.println("Error while closing BlankController: " + ex.getMessage());
-        }
+        sessionSyncController.close();
     }
 
-    // 15. crdt helpers
-    private void refreshMapping() {
-        visibleNodes.clear();
-        BlockNode block = blockDLL.getBlock("ROOT");
-        if (block == null) return;
-        block = block.getNext();
-
-        while (block != null) {
-            if (!block.isDeleted() && block.getContent() != null) {
-                CharNode c = block.getContent().getHead().getNext();
-                while (c != null) {
-                    if (!c.getIsDeleted()) visibleNodes.add(c);
-                    c = c.getNext();
-                }
-            }
-            block = block.getNext();
-        }
+    long nextClock() {
+        return ++clock;
     }
 
-    // ensures a seed block exists so the document always has a valid insertion point.
-    private void ensureSeedBlock() {
-        BlockNode root = blockDLL.getBlock("ROOT");
-        if (root == null) return;
-        if (root.getNext() != null && root.getNext().getContent() != null) return; // already exists
-
-        CharDLL seedContent = new CharDLL(0, 1, 0L);
-        BlockNode seedBlock = new BlockNode(0, 2, 0L, seedContent, "ROOT");
-        blockDLL.insert(seedBlock);
+    long now() {
+        return System.currentTimeMillis();
     }
 
-    private String getSeedHeadID() {
-        BlockNode root = blockDLL.getBlock("ROOT");
-        if (root == null || root.getNext() == null || root.getNext().getContent() == null) return null;
-        return root.getNext().getContent().getHeadID();
-    }
-
-    private String resolveParentIDForInsert(int textAreaIndex, String rootID) {
-        if (visibleNodes.isEmpty() || textAreaIndex == 0) return rootID;
-        int idx = Math.min(textAreaIndex, visibleNodes.size()) - 1;
-        return visibleNodes.get(idx).getCharID();
-    }
-
-    // after insert with given clock, find char id assigned to it
-    private String resolveInsertedCharID(long insertClock) {
-        refreshMapping();
-        for (CharNode node : visibleNodes) {
-            if (node.getSiteID() == mySiteID && node.getClock() == insertClock) {
-                return node.getCharID();
-            }
-        }
-        return getSeedHeadID(); // should never happen
-    }
-
-    // 16. color helpers
-    private String colorForSite(int siteID) {
-        return USER_COLORS[colorIndexForSite(siteID)];
-    }
-
-    private int colorIndexForSite(int siteID) {
-        Integer assigned = siteColorIndices.get(siteID);
-        if (assigned != null && assigned >= 0) {
-            return Math.max(0, Math.min(assigned, USER_COLORS.length - 1));
-        }
-
-        // Fallback: assign distinct colors deterministically from the currently
-        // visible set of collaborators so two users don't collapse to the same
-        // color just because their site IDs share the same modulo.
-        List<Integer> knownSites = new ArrayList<>(remoteCursorPositions.keySet());
-        knownSites.add(mySiteID);
-        knownSites.sort(Integer::compareTo);
-
-        int distinctIndex = knownSites.indexOf(siteID);
-        if (distinctIndex < 0) {
-            distinctIndex = Math.abs(siteID);
-        }
-
-        return distinctIndex % USER_COLORS.length;
-    }
-
-    // 17. utilities
-    public void setDocID(String docID) {
-        this.docID = docID;
-    }
-    public String getDocID() {return docID;}
-    private String buildActionId(Action action) {
+    String buildActionId(Action action) {
         if (action == null) return "null";
         return action.getDocumentId() + ":" + action.getSiteID() + ":" + action.getClock();
     }
 
-    private long now() {
-        return System.currentTimeMillis();
-    }
-
-    // runs an update with isRemoteUpdate = true & restores previous flag
-    private void withRemoteFlag(Runnable task) {
-        boolean prev = isRemoteUpdate;
+    void withRemoteFlag(Runnable task) {
+        boolean previous = isRemoteUpdate;
         isRemoteUpdate = true;
-        try { task.run(); }
-        finally { isRemoteUpdate = prev; }
+        try {
+            task.run();
+        } finally {
+            isRemoteUpdate = previous;
+        }
     }
 
+    boolean isRemoteUpdate() {
+        return isRemoteUpdate;
+    }
+
+    boolean replaceRemoteUpdate(boolean newValue) {
+        boolean previous = isRemoteUpdate;
+        isRemoteUpdate = newValue;
+        return previous;
+    }
+
+    void setWsService(WebSocketService wsService) {
+        this.wsService = wsService;
+    }
+
+    WebSocketService getWsService() {
+        return wsService;
+    }
+
+    Set<String> getSeenActionIds() {
+        return seenActionIds;
+    }
+
+    int getMySiteID() {
+        return mySiteID;
+    }
+
+    String getDocName() {
+        return docName;
+    }
+
+    String getDocID() {
+        return docID;
+    }
+
+    boolean canEdit() {
+        return canEdit;
+    }
+
+    BlockDLL getBlockDLL() {
+        return blockDLL;
+    }
+
+    EditorDocumentController getDocumentController() {
+        return documentController;
+    }
+
+    PresenceController getPresenceController() {
+        return presenceController;
+    }
+
+    public void setDocID(String docID) {
+        this.docID = docID;
+    }
 }
