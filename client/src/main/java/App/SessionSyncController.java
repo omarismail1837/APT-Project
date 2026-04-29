@@ -20,10 +20,15 @@ class SessionSyncController {
         Runnable onConnected;
         if (host.canEdit()) {
             onConnected = () -> javafx.application.Platform.runLater(() ->
-                    presenceController.broadcastCursorPosition(host.textArea.getCaretPosition(), true)
+                    {
+                        presenceController.broadcastPresence();
+                        presenceController.broadcastCursorPosition(host.textArea.getCaretPosition(), true);
+                    }
             );
         } else {
-            onConnected = () -> {}; // do nothing if view only
+            onConnected = () -> javafx.application.Platform.runLater(
+                    presenceController::broadcastPresence
+            );
         }
         WebSocketService wsService = new WebSocketService(
                 host.getDocID(),
@@ -46,6 +51,11 @@ class SessionSyncController {
         if (!host.getDocID().equals(action.getDocumentId())) return;
 
         String type = action.getActionType();
+
+        if ("PRESENCE".equals(type)){
+            presenceController.handleRemotePresence(action);
+            return;
+        }
         if ("CURSOR".equals(type)) {
             presenceController.handleRemoteCursor(action);
             return;

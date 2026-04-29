@@ -98,6 +98,20 @@ class PresenceController {
         host.withRemoteFlag(documentController::refreshUI);
     }
 
+    void handleRemotePresence(Action action) {
+        int siteID = action.getSiteID();
+        if (siteID == host.getMySiteID()) return;
+        String extra = action.getExtraData();
+        if (extra != null && !extra.isBlank()) {
+            remoteUserNames.put(siteID, extra);
+
+        } else {
+            remoteUserNames.putIfAbsent(siteID, "User-" + Math.abs(siteID % 1000));
+        }
+        host.withRemoteFlag(documentController::refreshUI);
+        host.withRemoteFlag(this::updateActiveUsersPanel);
+    }
+
     void broadcastCursorPosition(int caretPos, boolean force) {
         if (host.getWsService() == null) return;
         long now = host.now();
@@ -109,6 +123,13 @@ class PresenceController {
 
         Action action = new Action(host.nextClock(), now, host.getMySiteID(), host.getDocID(),
                 "CURSOR", charID, null, "User-" + (host.getMySiteID() % 1000));
+        host.getWsService().sendAction(action);
+    }
+
+    void broadcastPresence()
+    {
+        Action action = new Action(host.nextClock(), host.now(), host.getMySiteID(), host.getDocID(),
+                        "PRESENCE", null, null, "User-" + (host.getMySiteID() % 1000));
         host.getWsService().sendAction(action);
     }
 
@@ -140,7 +161,8 @@ class PresenceController {
         host.activeUsersBox.getChildren().clear();
         host.activeUsersBox.getChildren().add(makeUserRow("You", "white"));
 
-        List<Integer> activeSites = new ArrayList<>(remoteCursorPositions.keySet());
+        System.out.println("USERS: " + remoteUserNames);
+        List<Integer> activeSites = new ArrayList<>(remoteUserNames.keySet());
         Collections.sort(activeSites);
         activeSites.stream()
                 .limit(BlankController.MAX_REMOTE_USERS)
@@ -151,7 +173,7 @@ class PresenceController {
 
         if (host.connectedLabel != null) {
             host.connectedLabel.setText((1 + Math.min(activeSites.size(), BlankController.MAX_REMOTE_USERS))
-                    + " editors connected");
+                    + " users connected");
         }
     }
 
@@ -205,7 +227,13 @@ class PresenceController {
     }
 
     private String colorForSite(int siteID) {
-        return BlankController.USER_COLORS[siteColorIndices.get(siteID)];
+        Integer colorIndex = siteColorIndices.get(siteID);
+
+        if (colorIndex == null) {
+            return "gray";
+        }
+
+        return BlankController.USER_COLORS[colorIndex];
     }
 
     private HBox makeUserRow(String name, String color) {
