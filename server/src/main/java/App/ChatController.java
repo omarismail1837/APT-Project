@@ -164,7 +164,11 @@ public class ChatController {
         if (canEdit && !update.getActionType().equals("CURSOR")) {
             actionRepository.save(update);
         }
-        if (canEdit || update.getActionType().equals("CURSOR") || update.getActionType().equals("DISCONNECT")) {
+        if (canEdit
+                || update.getActionType().equals("CURSOR")
+                || update.getActionType().equals("DISCONNECT")
+                || update.getActionType().equals("CURSOR_REMOVE")
+                || update.getActionType().equals("PRESENCE")) {
             messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", update);
         }
     }
