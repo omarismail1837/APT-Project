@@ -43,6 +43,7 @@ public class ChatController {
         List<String> viewers = new ArrayList<>();
         // Track userId -> last cursor Action
         Map<String, Action> cursors = new HashMap<>();
+        Map<String, Action> presences = new HashMap<>();
     }
 
     private String generateReadableCode() {
@@ -154,14 +155,22 @@ public class ChatController {
 
         if (update.getActionType().equals("DISCONNECT")) {
             info.cursors.remove(userId);
+            info.presences.remove(userId);
         }
         else if (update.getActionType().equals("CURSOR") && info != null && userId != null) {
             info.cursors.put(userId, update);
         }
+        else if (update.getActionType().equals("PRESENCE"))
+        {
+            info.presences.put(userId, update);
+        }
         else { //update last updated
             docRepository.updateLastModified(documentId,new Date());
         }
-        if (canEdit && !update.getActionType().equals("CURSOR")) {
+        if (canEdit && !update.getActionType().equals("CURSOR") &&
+                !update.getActionType().equals("PRESENCE") &&
+                !update.getActionType().equals("CURSOR_REMOVE") &&
+                !update.getActionType().equals("DISCONNECT")) {
             actionRepository.save(update);
         }
         if (canEdit
@@ -183,6 +192,9 @@ public class ChatController {
         SessionInfo info = sessions.get(docId);
         if (info != null && !info.cursors.isEmpty()) {
             history.addAll(info.cursors.values());
+        }
+        if (info != null && !info.presences.isEmpty()) {
+            history.addAll(info.presences.values());
         }
         return history;
     }
