@@ -32,8 +32,8 @@ public class HelloController {
     @FXML private TextField sessionCodeField;
     @FXML private TextField newDocNameField;
     @FXML private TextField signupNameField;
-    @FXML private TextField signupEmailField;
-    @FXML private TextField loginEmailField;
+    @FXML private TextField signupUsernameField;
+    @FXML private TextField loginUsernameField;
     @FXML private PasswordField signupPasswordField;
     @FXML private PasswordField signupConfirmPasswordField;
     @FXML private PasswordField loginPasswordField;
@@ -266,50 +266,90 @@ public class HelloController {
     @FXML
     private void createAccount() {
         String name = signupNameField != null ? signupNameField.getText().trim() : "";
-        String email = signupEmailField != null ? signupEmailField.getText().trim() : "";
+        String username = signupUsernameField != null ? signupUsernameField.getText().trim() : "";
         String password = signupPasswordField != null ? signupPasswordField.getText() : "";
         String confirm = signupConfirmPasswordField != null ? signupConfirmPasswordField.getText() : "";
 
-        if (name.isBlank() || email.isBlank() || password.isBlank() || confirm.isBlank()) {
+        if (name.isBlank() || username.isBlank() || password.isBlank() || confirm.isBlank()) {
             setSignupStatus("Fill in all fields.");
             return;
         }
-        if (!email.contains("@") || !email.contains(".")) {
-            setSignupStatus("Enter a valid email address.");
-            return;
-        }
+
         if (password.length() < 8) {
             setSignupStatus("Use at least 8 characters for the password.");
             return;
         }
+
         if (!password.equals(confirm)) {
             setSignupStatus("Passwords do not match.");
             return;
         }
 
-        setSignupStatus("Account profile saved locally. You can start a document now.");
-        if (newDocNameField != null && newDocNameField.getText().isBlank()) {
-            newDocNameField.setText(name + "'s document");
+        String res;
+        try {
+            res = sendAuthRequest("signup", username, password);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
+
+        if (res.equals("username_not_unique")) {
+            setSignupStatus("Username is taken. Please choose another username.");
+            return;
+        }
+
+        userId = res.hashCode();
         showSessionPane();
     }
 
     @FXML
     private void loginAccount() {
-        String email = loginEmailField != null ? loginEmailField.getText().trim() : "";
+        String username = loginUsernameField != null ? loginUsernameField.getText().trim() : "";
         String password = loginPasswordField != null ? loginPasswordField.getText() : "";
 
-        if (email.isBlank() || password.isBlank()) {
+        if (username.isBlank() || password.isBlank()) {
             setLoginStatus("Enter your email and password.");
             return;
         }
-        if (!email.contains("@") || !email.contains(".")) {
-            setLoginStatus("Enter a valid email address.");
+
+        String res;
+        try {
+            res = sendAuthRequest("login", username, password);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (res.equals("does_not_exist"))
+        {
+            setLoginStatus("No account found with that email.");
+            return;
+        }
+        else if (res.equals("incorrect_password"))
+        {
+            setLoginStatus("Incorrect password. Try again.");
             return;
         }
 
-        setLoginStatus("Login profile loaded locally. Session tools are ready.");
+        // returned user id is string but everything else is int based, so we hash it to get an int
+        userId = res.hashCode();
         showSessionPane();
+    }
+
+    private String sendAuthRequest(String endpoint, String username, String password) throws IOException {
+        // for better security im not adding password in the url itself
+        URL url = new URL("https://apt-project-production-326d.up.railway.app/" + endpoint);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json"); // send a json
+        conn.setDoOutput(true);
+
+        JSONObject body = new JSONObject();
+        body.put("username", username);
+        body.put("password", password);
+
+        // write the json body to the output stream
+        conn.getOutputStream().write(body.toString().getBytes(StandardCharsets.UTF_8));
+
+        return readResponse(conn);
     }
 
     @FXML

@@ -84,8 +84,8 @@
                     <Label text="Log in" styleClass="card-title"/>
                     <Label text="Use your local profile to continue into the workspace." styleClass="card-sub"/>
 
-                    <TextField fx:id="loginEmailField"
-                               promptText="Email address"
+                    <TextField fx:id="loginUsernameField"
+                               promptText="Username"
                                styleClass="join-input"/>
                     <PasswordField fx:id="loginPasswordField"
                                    promptText="Password"
@@ -112,8 +112,8 @@
                     <TextField fx:id="signupNameField"
                                promptText="Full name"
                                styleClass="join-input"/>
-                    <TextField fx:id="signupEmailField"
-                               promptText="Email address"
+                    <TextField fx:id="signupUsernameField"
+                               promptText="Username"
                                styleClass="join-input"/>
                     <PasswordField fx:id="signupPasswordField"
                                    promptText="Password"
