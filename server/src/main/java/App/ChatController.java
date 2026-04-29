@@ -7,10 +7,7 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -240,7 +237,7 @@ public class ChatController {
         }, 5, TimeUnit.MINUTES);
     }
 
-    @MessageMapping("/signup")
+    @PostMapping("/signup")
     public String signup(UserAccount user)
     {
         if (userRepository.existsByUsername(user.getUsername())) {
@@ -250,7 +247,7 @@ public class ChatController {
         return user.getUserId() + ":" + user.getUsername();
     }
 
-    @MessageMapping("/login")
+    @PostMapping("/login")
     public String login(UserAccount user) {
         Optional<UserAccount> found = userRepository.findByUsername(user.getUsername());
 
