@@ -23,16 +23,18 @@ public class ChatController {
     private final SimpMessagingTemplate messagingTemplate;
     private final ActionRepository actionRepository;
     private final DocRepository docRepository;
+    private final UserRepository userRepository;
     private final Faker faker = new Faker();
     //needed to close session after 5 minutes of being empty
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     // Session info: docId -> SessionInfo
     private final Map<String, SessionInfo> sessions = new HashMap<>();
 
-    public ChatController(SimpMessagingTemplate messagingTemplate, ActionRepository actionRepository, DocRepository docRepository) {
+    public ChatController(SimpMessagingTemplate messagingTemplate, ActionRepository actionRepository, DocRepository docRepository, UserRepository userRepository) {
         this.messagingTemplate = messagingTemplate;
         this.actionRepository = actionRepository;
         this.docRepository = docRepository;
+        this.userRepository = userRepository;
     }
 
     // SessionInfo holds codes and lists of editors/viewers
@@ -236,6 +238,29 @@ public class ChatController {
                 System.out.println("Session " + docId + " expired. Next join will generate new codes.");
             }
         }, 5, TimeUnit.MINUTES);
+    }
+
+    @MessageMapping("/signup")
+    public String signup(UserAccount user)
+    {
+        if (userRepository.existsByUsername(user.getUsername())) {
+            return "username_taken";
+        }
+        userRepository.save(user);
+        return user.getUserId() + ":" + user.getUsername();
+    }
+
+    @MessageMapping("/login")
+    public String login(UserAccount user) {
+        Optional<UserAccount> found = userRepository.findByUsername(user.getUsername());
+
+        if (found.isEmpty()) return "does_not_exist";
+
+        if (!found.get().getPassword().equals(user.getPassword())) {
+            return "incorrect_password";
+        }
+
+        return user.getUserId() + ":" + user.getUsername();
     }
 
     @GetMapping("/docs/{userId}")
