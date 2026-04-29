@@ -258,4 +258,12 @@ public class ChatController {
     private List<DocMetadata> getDocs(@PathVariable String userId) {
         return docRepository.findByOwnerId(userId);
     }
+
+    // temporary endpoint to view all users for testing only
+    // instead of using mongodb ill copy paste https://apt-project-production-326d.up.railway.app/users in browser
+    @GetMapping("/users")
+    public List<UserAccount> getAllUsers() {
+        return userRepository.findAll();
+    }
+
 }
