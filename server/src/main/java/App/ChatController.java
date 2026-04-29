@@ -178,7 +178,6 @@ public class ChatController {
                 || update.getActionType().equals("DISCONNECT")
                 || update.getActionType().equals("CURSOR_REMOVE")
                 || update.getActionType().equals("PRESENCE")) {
-            System.out.println("SERVER BROADCASTING: " + update.getActionType());
             messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", update);
         }
     }
