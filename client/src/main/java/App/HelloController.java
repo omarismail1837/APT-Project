@@ -106,10 +106,9 @@ public class HelloController {
         if (conn.getResponseCode() == 200) {
             String raw = readResponse(conn).trim();
             if (raw.equals("invalid")) {
-                System.err.println("❌ Access Denied: Invalid code.");
+                invalidCodeAlert();
                 return;
             }
-
 
             // role:docId:docName:editCode:viewCode
             String[] parts = raw.split(":");
@@ -125,6 +124,15 @@ public class HelloController {
             // Call loader with the correct order of arguments
             loadEditorScene(actualDocId, docName, viewCode, finalEditCode, canEdit, userId, sourceButton, importContent);
         }
+    }
+
+    private void invalidCodeAlert()
+    {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Invalid Code");
+        alert.setHeaderText(null);
+        alert.setContentText("The session code you entered is invalid. Please check and try again.");
+        alert.showAndWait();
     }
 
     private void loadEditorScene(String docID, String docName, String viewCode, String editCode,
