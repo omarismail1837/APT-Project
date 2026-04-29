@@ -18,7 +18,7 @@ public class BlankController implements Initializable {
 
     static final String[] USER_COLORS = {"#3b82f6", "#10b981", "#8b5cf6"};
     static final long CURSOR_THROTTLE_MS = 80;
-    static final int MAX_REMOTE_USERS = 3;
+    static final int MAX_REMOTE_EDITORS = 3;
     static final String WS_URL = "https://apt-project-production-326d.up.railway.app/ws-connect";
 
     private final int mySiteID;

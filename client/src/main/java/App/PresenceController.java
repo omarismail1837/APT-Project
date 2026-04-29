@@ -57,12 +57,6 @@ class PresenceController {
         });
     }
 
-    void updateRemoteCaretColor(int siteID) {
-        CaretNode caret = remoteCarets.get(siteID);
-        if (caret == null) return;
-        caret.setStroke(Color.web(colorForSite(siteID)));
-    }
-
     void handleRemoteCursor(Action action) {
         int siteID = action.getSiteID();
         if (siteID == host.getMySiteID()) return;
@@ -100,7 +94,6 @@ class PresenceController {
 
     void handleRemotePresence(Action action) {
         int siteID = action.getSiteID();
-        System.out.println("ADDING USER TO MAP: " + siteID);
         if (siteID == host.getMySiteID()) return;
         String extra = action.getExtraData();
         if (extra != null && !extra.isBlank()) {
@@ -129,7 +122,6 @@ class PresenceController {
 
     void broadcastPresence()
     {
-        System.out.println("SENDING PRESENCE from " + host.getMySiteID());
         Action action = new Action(host.nextClock(), host.now(), host.getMySiteID(), host.getDocID(),
                         "PRESENCE", null, null, "User-" + (host.getMySiteID() % 1000));
         host.getWsService().sendAction(action);
@@ -159,22 +151,32 @@ class PresenceController {
 
     void updateActiveUsersPanel() {
         if (host.activeUsersBox == null) return;
-        System.out.println("DRAW USERS: " + remoteUserNames.keySet());
         host.activeUsersBox.getChildren().clear();
-        host.activeUsersBox.getChildren().add(makeUserRow("You", "white"));
+        String youcolor;
+        String youtext;
+        if (host.canEdit())
+        {
+            youcolor = "white"; youtext = "You";
+        }
+        else
+        {
+            youcolor = "gray"; youtext = "You (viewer)";
+        }
+        host.activeUsersBox.getChildren().add(makeUserRow(youtext, youcolor));
 
-        System.out.println("USERS: " + remoteUserNames);
         List<Integer> activeSites = new ArrayList<>(remoteUserNames.keySet());
         Collections.sort(activeSites);
         activeSites.stream()
-                .limit(BlankController.MAX_REMOTE_USERS)
                 .forEach(siteID -> {
                     String name = remoteUserNames.getOrDefault(siteID, "User-" + Math.abs(siteID % 1000));
-                    host.activeUsersBox.getChildren().add(makeUserRow(name, colorForSite(siteID)));
+                    String color = colorForSite(siteID);
+                    if (!remoteCursorPositions.containsKey(siteID))
+                        name = name + " (viewer)";
+                    host.activeUsersBox.getChildren().add(makeUserRow(name, color));
                 });
 
         if (host.connectedLabel != null) {
-            host.connectedLabel.setText((1 + Math.min(activeSites.size(), BlankController.MAX_REMOTE_USERS))
+            host.connectedLabel.setText((1 + activeSites.size())
                     + " users connected");
         }
     }
