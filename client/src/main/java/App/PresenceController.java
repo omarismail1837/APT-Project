@@ -100,6 +100,7 @@ class PresenceController {
 
     void handleRemotePresence(Action action) {
         int siteID = action.getSiteID();
+        System.out.println("ADDING USER TO MAP: " + siteID);
         if (siteID == host.getMySiteID()) return;
         String extra = action.getExtraData();
         if (extra != null && !extra.isBlank()) {
@@ -158,7 +159,7 @@ class PresenceController {
 
     void updateActiveUsersPanel() {
         if (host.activeUsersBox == null) return;
-
+        System.out.println("DRAW USERS: " + remoteUserNames.keySet());
         host.activeUsersBox.getChildren().clear();
         host.activeUsersBox.getChildren().add(makeUserRow("You", "white"));
 

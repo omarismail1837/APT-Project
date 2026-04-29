@@ -48,6 +48,7 @@ class SessionSyncController {
 
     void handleRemoteAction(Action action) {
         if (action == null) return;
+        System.out.println("CLIENT RECEIVED: " + action.getActionType() + " from " + action.getSiteID());
         if (!host.getDocID().equals(action.getDocumentId())) return;
 
         String type = action.getActionType();
