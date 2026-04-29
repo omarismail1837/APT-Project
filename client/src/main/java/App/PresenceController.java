@@ -128,6 +128,7 @@ class PresenceController {
 
     void broadcastPresence()
     {
+        System.out.println("SENDING PRESENCE from " + host.getMySiteID());
         Action action = new Action(host.nextClock(), host.now(), host.getMySiteID(), host.getDocID(),
                         "PRESENCE", null, null, "User-" + (host.getMySiteID() % 1000));
         host.getWsService().sendAction(action);
