@@ -38,8 +38,6 @@ class SessionSyncController {
         if (action == null) return;
         if (!host.getDocID().equals(action.getDocumentId())) return;
 
-        presenceController.applyColorAssignment(action);
-
         String type = action.getActionType();
         if ("CURSOR".equals(type)) {
             presenceController.handleRemoteCursor(action);

@@ -27,6 +27,7 @@ class PresenceController {
     private final Map<Integer, String> remoteUserNames = new LinkedHashMap<>();
     private final Map<Integer, CaretNode> remoteCarets = new HashMap<>();
     private final Map<Integer, Integer> siteColorIndices = new HashMap<>();
+    private final Map<Integer, Integer> currentlyTakenColors = new HashMap<>();
     private long lastCursorBroadcastMs = 0;
 
     PresenceController(BlankController host, EditorDocumentController documentController) {
@@ -65,7 +66,7 @@ class PresenceController {
     void handleRemoteCursor(Action action) {
         int siteID = action.getSiteID();
         if (siteID == host.getMySiteID()) return;
-
+        assignColor(siteID);
         remoteCursorPositions.put(siteID, action.getStartCharID());
 
         String extra = action.getExtraData();
@@ -74,7 +75,6 @@ class PresenceController {
         } else {
             remoteUserNames.putIfAbsent(siteID, "User-" + Math.abs(siteID % 1000));
         }
-
         host.withRemoteFlag(documentController::refreshUI);
     }
 
@@ -84,12 +84,14 @@ class PresenceController {
 
         remoteCursorPositions.remove(siteID);
         remoteUserNames.remove(siteID);
+        releaseColor(siteID);
         removeRemoteCaret(siteID);
         host.withRemoteFlag(documentController::refreshUI);
     }
 
     void handleCursorRemove(Action action) {
         int siteID = action.getSiteID();
+        releaseColor(siteID);
         remoteCursorPositions.remove(siteID);
         remoteUserNames.remove(siteID);
         removeRemoteCaret(siteID);
@@ -174,16 +176,6 @@ class PresenceController {
         new ArrayList<>(remoteCarets.keySet()).forEach(this::removeRemoteCaret);
     }
 
-    void applyColorAssignment(Action action) {
-        if (action.getColorIndex() < 0) return;
-
-        Integer previous = siteColorIndices.put(action.getSiteID(), action.getColorIndex());
-        if (previous != null && previous == action.getColorIndex()) return;
-
-        updateRemoteCaretColor(action.getSiteID());
-        host.withRemoteFlag(this::updateActiveUsersPanel);
-    }
-
     String currentUserName() {
         return remoteUserNames.getOrDefault(host.getMySiteID(), "User-" + (host.getMySiteID() % 1000));
     }
@@ -209,25 +201,7 @@ class PresenceController {
     }
 
     private String colorForSite(int siteID) {
-        return BlankController.USER_COLORS[colorIndexForSite(siteID)];
-    }
-
-    private int colorIndexForSite(int siteID) {
-        Integer assigned = siteColorIndices.get(siteID);
-        if (assigned != null && assigned >= 0) {
-            return Math.max(0, Math.min(assigned, BlankController.USER_COLORS.length - 1));
-        }
-
-        List<Integer> knownSites = new ArrayList<>(remoteCursorPositions.keySet());
-        knownSites.add(host.getMySiteID());
-        knownSites.sort(Integer::compareTo);
-
-        int distinctIndex = knownSites.indexOf(siteID);
-        if (distinctIndex < 0) {
-            distinctIndex = Math.abs(siteID);
-        }
-
-        return distinctIndex % BlankController.USER_COLORS.length;
+        return BlankController.USER_COLORS[siteColorIndices.get(siteID)];
     }
 
     private HBox makeUserRow(String name, String color) {
@@ -238,5 +212,55 @@ class PresenceController {
         HBox row = new HBox(10, dot, label);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
+    }
+
+    private int assignColor(int siteID)
+    {
+        Integer assigned = siteColorIndices.get(siteID);
+        if (assigned != null) {
+            if (isColorAvailForSite(assigned, siteID)) {
+                currentlyTakenColors.put(assigned, siteID);
+                return assigned;
+            }
+        }
+        assigned = findFirstFreeColor();
+        siteColorIndices.put(siteID, assigned);
+        currentlyTakenColors.put(assigned, siteID);
+
+        return assigned;
+    }
+
+    private void releaseColor(int siteID)
+    {
+        Integer colorToRemove = null;
+
+        // loop over entries not over i = 0 1 2 3 because some colors may not be taken
+        for (Map.Entry<Integer, Integer> entry : currentlyTakenColors.entrySet()) {
+            if (entry.getValue() == siteID) {
+                colorToRemove = entry.getKey();
+                break;
+            }
+        }
+
+        if (colorToRemove != null) {
+            currentlyTakenColors.remove(colorToRemove);
+        }
+    }
+
+    private int findFirstFreeColor()
+    {
+        for (int i = 0; i < BlankController.USER_COLORS.length; i++) {
+            if (!currentlyTakenColors.containsKey(i)) {
+                return i;
+            }
+        }
+        return 0; // should never happen
+    }
+
+    private boolean isColorAvailForSite(int color, int siteID)
+    {
+        Integer owner = currentlyTakenColors.get(color);
+        if (owner == null || owner == siteID) return true;
+        return false;
     }
 }
