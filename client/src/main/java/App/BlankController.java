@@ -74,7 +74,7 @@ public class BlankController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         documentController.initializeDocument();
         documentController.setupTextAreaListener();
-        presenceController.setupCaretListener();
+        if (canEdit) presenceController.setupCaretListener();
         setupUI();
         sessionSyncController.setupWebSocket();
     }
@@ -82,10 +82,17 @@ public class BlankController implements Initializable {
     private void setupUI() {
         if (nameLabel != null) nameLabel.setText(docName + ".txt");
         if (docIdLabel != null) docIdLabel.setText(docID);
-        if (textArea != null) textArea.setEditable(canEdit);
+        if (textArea != null)
+        {
+            textArea.setEditable(canEdit);
+            boldButton.setDisable(!canEdit);
+            italicButton.setDisable(!canEdit);
+        }
+
+        if (!canEdit) textArea.setStyle("-fx-caret-color: transparent;");
+        else presenceController.setUpLocalCaretColor();
 
         setupCodeLabels();
-        presenceController.setUpLocalCaretColor();
         presenceController.updateActiveUsersPanel();
         presenceController.updateLineCol();
     }

@@ -17,11 +17,18 @@ class SessionSyncController {
     }
 
     void setupWebSocket() {
+        Runnable onConnected;
+        if (host.canEdit()) {
+            onConnected = () -> javafx.application.Platform.runLater(() ->
+                    presenceController.broadcastCursorPosition(host.textArea.getCaretPosition(), true)
+            );
+        } else {
+            onConnected = () -> {}; // do nothing if view only
+        }
         WebSocketService wsService = new WebSocketService(
                 host.getDocID(),
                 action -> javafx.application.Platform.runLater(() -> handleRemoteAction(action)),
-                () -> javafx.application.Platform.runLater(() ->
-                        presenceController.broadcastCursorPosition(host.textArea.getCaretPosition(), true))
+                onConnected
         );
 
         wsService.setOnDisconnected(() -> javafx.application.Platform.runLater(() -> {
