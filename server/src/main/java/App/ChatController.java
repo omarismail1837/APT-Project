@@ -238,26 +238,20 @@ public class ChatController {
     }
 
     @PostMapping("/signup")
-    public String signup(UserAccount user)
-    {
+    public String signup(@RequestBody UserAccount user) {
         if (userRepository.existsByUsername(user.getUsername())) {
-            return "username_taken";
+            return "username_not_unique";
         }
         userRepository.save(user);
-        return user.getUserId() + ":" + user.getUsername();
+        return user.getUserId();
     }
 
     @PostMapping("/login")
-    public String login(UserAccount user) {
-        Optional<UserAccount> found = userRepository.findByUsername(user.getUsername());
-
+    public String login(@RequestBody UserAccount login) {
+        Optional<UserAccount> found = userRepository.findByUsername(login.getUsername());
         if (found.isEmpty()) return "does_not_exist";
-
-        if (!found.get().getPassword().equals(user.getPassword())) {
-            return "incorrect_password";
-        }
-
-        return user.getUserId() + ":" + user.getUsername();
+        if (!found.get().getPassword().equals(login.getPassword())) return "incorrect_password";
+        return found.get().getUserId();
     }
 
     @GetMapping("/docs/{userId}")
