@@ -62,7 +62,9 @@ class SessionSyncController {
 
             host.getSeenActionIds().add(actionId);
             host.getBlockDLL().applyAction(action);
-            documentController.rerender(host.textArea.getCaretPosition());
+            int caretSnapshot = host.textArea.getCaretPosition();
+            int anchorSnapshot = host.textArea.getAnchor();
+            documentController.rerender(caretSnapshot, anchorSnapshot);
         }
     }
 

@@ -41,7 +41,7 @@ class EditorDocumentController {
                     boolean previousRemoteFlag = host.replaceRemoteUpdate(true);
                     javafx.application.Platform.runLater(() -> {
                         try {
-                            rerender(caretSnapshot);
+                            rerender(caretSnapshot, caretSnapshot);
                             host.getPresenceController().broadcastCursorPosition(host.textArea.getCaretPosition(), true);
                         } finally {
                             host.replaceRemoteUpdate(previousRemoteFlag);
@@ -94,14 +94,15 @@ class EditorDocumentController {
         }
     }
 
-    void rerender(int preferredCaret) {
+    void rerender(int preferredCaret, int preferredAnchor) {
         host.withRemoteFlag(() -> {
             refreshMapping();
             host.textArea.replaceText(host.getBlockDLL().collectText());
             applyStyles();
 
+            int safeAnchor = Math.max(0, Math.min(preferredAnchor, host.textArea.getLength()));
             int safeCaret = Math.max(0, Math.min(preferredCaret, host.textArea.getLength()));
-            host.textArea.selectRange(safeCaret, safeCaret);
+            host.textArea.selectRange(safeAnchor, safeCaret);
 
             javafx.application.Platform.runLater(() -> host.getPresenceController().updateRemoteCarets());
         });
@@ -222,7 +223,9 @@ class EditorDocumentController {
                 allStyled ? "false" : "true");
 
         applyAndSend(action);
-        rerender(host.textArea.getCaretPosition());
+        int caretSnapshot = host.textArea.getCaretPosition();
+        int anchorSnapshot = host.textArea.getAnchor();
+        rerender(caretSnapshot, anchorSnapshot);
     }
 
     private String defaultExportFileName() {

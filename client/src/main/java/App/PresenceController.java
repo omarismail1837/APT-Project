@@ -198,6 +198,10 @@ class PresenceController {
 
         host.textArea.removeCaret(caret);
         caret.dispose();
+        // fix stale caret after disconnect?
+        javafx.application.Platform.runLater(() -> {
+            host.textArea.requestFocus();
+        });
     }
 
     private String colorForSite(int siteID) {
