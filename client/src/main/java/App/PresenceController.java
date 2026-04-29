@@ -43,16 +43,15 @@ class PresenceController {
         });
     }
 
-    void updateLocalCaretColor() {
+    void setUpLocalCaretColor() {
         if (host.textArea == null) return;
 
-        String color = colorForSite(host.getMySiteID());
-        host.textArea.setStyle("-fx-caret-color: " + color + ";");
+        host.textArea.setStyle("-fx-caret-color: white;");
 
         javafx.application.Platform.runLater(() -> {
-            Node localCaret = host.textArea.lookup(".caret");
+            Node localCaret = host.textArea.lookup(".caret"); // .caret only finds in the built-in caret
             if (localCaret instanceof Path path) {
-                path.setStroke(Color.web(color));
+                path.setStroke(Color.web("white"));
             }
         });
     }
@@ -137,7 +136,7 @@ class PresenceController {
         if (host.activeUsersBox == null) return;
 
         host.activeUsersBox.getChildren().clear();
-        host.activeUsersBox.getChildren().add(makeUserRow("You", colorForSite(host.getMySiteID())));
+        host.activeUsersBox.getChildren().add(makeUserRow("You", "white"));
 
         List<Integer> activeSites = new ArrayList<>(remoteCursorPositions.keySet());
         Collections.sort(activeSites);
@@ -181,11 +180,7 @@ class PresenceController {
         Integer previous = siteColorIndices.put(action.getSiteID(), action.getColorIndex());
         if (previous != null && previous == action.getColorIndex()) return;
 
-        if (action.getSiteID() == host.getMySiteID()) {
-            updateLocalCaretColor();
-        } else {
-            updateRemoteCaretColor(action.getSiteID());
-        }
+        updateRemoteCaretColor(action.getSiteID());
         host.withRemoteFlag(this::updateActiveUsersPanel);
     }
 

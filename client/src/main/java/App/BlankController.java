@@ -85,7 +85,7 @@ public class BlankController implements Initializable {
         if (textArea != null) textArea.setEditable(canEdit);
 
         setupCodeLabels();
-        presenceController.updateLocalCaretColor();
+        presenceController.setUpLocalCaretColor();
         presenceController.updateActiveUsersPanel();
         presenceController.updateLineCol();
     }
