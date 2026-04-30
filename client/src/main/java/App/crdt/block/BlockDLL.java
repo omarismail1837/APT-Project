@@ -426,4 +426,13 @@ public class BlockDLL implements ICRDT<BlockNode> {
     public BlockNode getHead() {
         return head;
     }
+
+    public void clear() {
+        head.setNext(null);
+        map.clear();
+        charBlockMap.clear();
+        map.put("ROOT", head);
+        if (allActions != null) allActions.clear();
+        if (appliedActionIds != null) appliedActionIds.clear();
+    }
 }

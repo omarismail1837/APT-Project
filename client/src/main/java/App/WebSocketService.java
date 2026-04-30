@@ -219,6 +219,36 @@ public class WebSocketService {
         }
     }
 
+    public void resubscribeInitialState(String docId) {
+        if (session == null || !session.isConnected()) return;
+        replayState.set(1);
+        bufferedLiveUpdates.clear();
+        session.subscribe("/app/docs/" + docId + "/initial-state", new StompFrameHandler() {
+            @Override
+            public Type getPayloadType(StompHeaders headers) { return Object.class; }
+
+            @Override
+            public void handleFrame(StompHeaders headers, Object payload) {
+                try {
+                    List<Action> actions = null;
+                    if (payload instanceof byte[] bytes) {
+                        actions = objectMapper.readValue(bytes,
+                                objectMapper.getTypeFactory().constructCollectionType(List.class, Action.class));
+                    } else if (payload instanceof List<?> list) {
+                        actions = list.stream().map(item -> convertToAction(item)).toList();
+                    }
+                    if (actions != null) {
+                        for (Action a : actions) { onActionReceived.accept(a); }
+                    }
+                } catch (Exception e) {
+                    System.err.println("resubscribeInitialState decode failed: " + e.getMessage());
+                } finally {
+                    switchToLiveMode();
+                }
+            }
+        });
+    }
+
     private void flushPendingActions() {
         StompSession current = session;
         if (current == null || !current.isConnected()) return;

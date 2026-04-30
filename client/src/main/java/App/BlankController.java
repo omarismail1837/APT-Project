@@ -39,6 +39,7 @@ public class BlankController implements Initializable {
     private final EditorDocumentController documentController;
     private final PresenceController presenceController;
     private final SessionSyncController sessionSyncController;
+    private final VersionHistoryController versionHistoryController;
 
     @FXML Label nameLabel;
     @FXML VBox activeUsersBox;
@@ -46,6 +47,8 @@ public class BlankController implements Initializable {
     @FXML Button boldButton;
     @FXML Button italicButton;
     @FXML Button exportButton;
+    @FXML Button saveVersionButton;
+    @FXML Button historyButton;
     @FXML Label docIdLabel;
     @FXML Label lineColLabel;
     @FXML Label connectedLabel;
@@ -66,6 +69,7 @@ public class BlankController implements Initializable {
         this.documentController = new EditorDocumentController(this);
         this.presenceController = new PresenceController(this, documentController);
         this.sessionSyncController = new SessionSyncController(this, documentController, presenceController);
+        this.versionHistoryController = new VersionHistoryController(this, documentController);
     }
 
     public BlankController(BlockDLL blockDLL) {
@@ -128,6 +132,12 @@ public class BlankController implements Initializable {
     private void exportDocument() {
         documentController.exportDocument();
     }
+
+    @FXML
+    private void saveVersion() {versionHistoryController.saveVersion();}
+
+    @FXML
+    private void showHistory() {versionHistoryController.showHistory();}
 
     public void close() {
         sessionSyncController.close();
@@ -216,5 +226,15 @@ public class BlankController implements Initializable {
     {
         if (c == null || c.isBlank()) return;
         textArea.replaceText(c);
+    }
+    public void handleRemoteRestore() {
+        javafx.application.Platform.runLater(() -> {
+            blockDLL.clear();
+            seenActionIds.clear();
+            documentController.initializeDocument();
+            if (wsService != null) {
+                wsService.resubscribeInitialState(docID);
+            }
+        });
     }
 }

@@ -69,7 +69,10 @@ class SessionSyncController {
             presenceController.handleCursorRemove(action);
             return;
         }
-
+        if ("RESTORE".equals(type)) {
+            host.handleRemoteRestore();
+            return;
+        }
         if ("INSERT".equals(type)
                 || "DELETE".equals(type)
                 || "BOLD".equals(type)
