@@ -6,15 +6,18 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -40,11 +43,14 @@ public class HelloController {
     @FXML private VBox sessionPane;
     @FXML private VBox signupPane;
     @FXML private VBox loginPane;
+    @FXML private VBox browsePane;
     @FXML private Label signupStatusLabel;
     @FXML private Label loginStatusLabel;
+    @FXML private FlowPane docsFlowPane;
 
     private int userId;
     private String username;
+    private String accountId;
 
     public HelloController(BlockDLL blockDLL) {
         this.blockDLL = blockDLL;
@@ -192,7 +198,7 @@ public class HelloController {
     private SessionInfo getCodesFromServer(String docId, String name) throws IOException {
         String encodedName = URLEncoder.encode(name == null ? "" : name, StandardCharsets.UTF_8);
         URL url = new URL("https://apt-project-production-326d.up.railway.app/docs/" + docId + "/get-codes" +
-                "?userId=" + userId +
+                "?userId=" + accountId +
                 "&name=" + encodedName);
 
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -259,6 +265,76 @@ public class HelloController {
     }
 
     @FXML
+    private void showBrowse() {
+        if (accountId == null) return;
+        try {
+            HttpURLConnection conn = (HttpURLConnection) new URL(
+                    "https://apt-project-production-326d.up.railway.app/docs/" + accountId).openConnection();
+            String response = readResponse(conn);
+            populateDocsPane(response);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        clearStatusLabels();
+        setVisiblePane(browsePane);
+    }
+
+    private void populateDocsPane(String response) {
+        docsFlowPane.getChildren().clear();
+        JSONArray arr = new JSONArray(response);
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject doc = arr.getJSONObject(i);
+            String docId = doc.getString("docId");
+            String name = doc.getString("name");
+            String editCode = doc.optString("editCode", null);
+            docsFlowPane.getChildren().add(makeDocCard(name, editCode));
+        }
+    }
+
+    private VBox makeDocCard(String name, String editCode) {
+        // preview area
+        Label preview = new Label("Click to open");
+        preview.setWrapText(true);
+        preview.setStyle("-fx-text-fill: #b4b2a9; -fx-font-size: 12px;");
+
+        VBox previewBox = new VBox(preview);
+        previewBox.setPrefSize(140, 90);
+        previewBox.setStyle("-fx-background-color: #f8f7f4; -fx-background-radius: 6; -fx-padding: 8;");
+
+        Label nameLabel = new Label(name);
+        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #1a1a1a;");
+        nameLabel.setWrapText(true);
+        nameLabel.setMaxWidth(140);
+
+        VBox card = new VBox(8, previewBox, nameLabel);
+        card.setPrefWidth(156);
+        card.setStyle("-fx-background-color: white; -fx-border-color: #e0ddd6; -fx-border-width: 0.5; " +
+                "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;");
+
+        card.setOnMouseClicked(e -> {
+            if (editCode == null || editCode.isBlank()) return;
+            try {
+                String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code="
+                        + editCode + "&userId=" + userId;
+                HttpURLConnection conn = (HttpURLConnection) new URL(joinUrl).openConnection();
+                processSession(conn, newDocButton, name, null);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        // hover effect
+        card.setOnMouseEntered(e -> card.setStyle(
+                "-fx-background-color: #f8f7f4; -fx-border-color: #378ADD; -fx-border-width: 1; " +
+                        "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;"));
+        card.setOnMouseExited(e -> card.setStyle(
+                "-fx-background-color: white; -fx-border-color: #e0ddd6; -fx-border-width: 0.5; " +
+                        "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;"));
+
+        return card;
+    }
+
+    @FXML
     private void showSessionPane() {
         clearStatusLabels();
         setVisiblePane(sessionPane);
@@ -299,6 +375,7 @@ public class HelloController {
         }
 
         userId = res.hashCode();
+        accountId = res;
         this.username = username;
         showSessionPane();
     }
@@ -333,6 +410,7 @@ public class HelloController {
 
         // returned user id is string but everything else is int based, so we hash it to get an int
         userId = res.hashCode();
+        accountId = res;
         this.username = username;
         showSessionPane();
     }
@@ -428,6 +506,7 @@ public class HelloController {
         setPaneVisible(sessionPane, targetPane == sessionPane);
         setPaneVisible(signupPane, targetPane == signupPane);
         setPaneVisible(loginPane, targetPane == loginPane);
+        setPaneVisible(browsePane, targetPane == browsePane);
     }
 
     private void setPaneVisible(VBox pane, boolean visible) {

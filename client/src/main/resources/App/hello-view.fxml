@@ -13,6 +13,7 @@
 <?import javafx.scene.control.Separator?>
 <?import javafx.geometry.Insets?>
 
+<?import javafx.scene.layout.FlowPane?>
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="App.HelloController"
             prefWidth="900"
@@ -53,6 +54,7 @@
                             maxWidth="Infinity"/>
 
                     <Button text="Browse documents"
+                            onAction="#showBrowse"
                             styleClass="btn-secondary"
                             maxWidth="Infinity"/>
 
@@ -142,6 +144,13 @@
                             maxWidth="Infinity"/>
                 </VBox>
 
+                    <VBox fx:id="browsePane" spacing="16" visible="false" managed="false">
+                        <Label text="Your documents" styleClass="card-title"/>
+                        <ScrollPane fitToWidth="true" prefHeight="400" styleClass="body-scroll">
+                            <FlowPane fx:id="docsFlowPane" hgap="12" vgap="12" prefWrapLength="340"/>
+                        </ScrollPane>
+                        <Button text="Back" onAction="#showSessionPane" styleClass="btn-secondary" maxWidth="Infinity"/>
+                    </VBox>
                 </VBox>
             </StackPane>
         </ScrollPane>
