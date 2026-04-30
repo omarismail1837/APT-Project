@@ -90,11 +90,11 @@ class SessionSyncController {
         try {
             if (host.getWsService() != null) {
                 long now = host.now();
-                String userName = presenceController.currentUserName();
+                String username = host.getUsername();
                 Action cursorRemove = new Action(host.nextClock(), now, host.getMySiteID(), host.getDocID(),
-                        "CURSOR_REMOVE", null, null, userName);
+                        "CURSOR_REMOVE", null, null, username);
                 Action disconnect = new Action(host.nextClock(), now + 1, host.getMySiteID(), host.getDocID(),
-                        "DISCONNECT", null, null, userName);
+                        "DISCONNECT", null, null, username);
 
                 try {
                     host.getWsService().sendAction(cursorRemove);

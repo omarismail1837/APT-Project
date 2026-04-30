@@ -22,6 +22,7 @@ public class BlankController implements Initializable {
     static final String WS_URL = "https://apt-project-production-326d.up.railway.app/ws-connect";
 
     private final int mySiteID;
+    private final String username;
     private final String docName;
     private final BlockDLL blockDLL;
 
@@ -52,7 +53,7 @@ public class BlankController implements Initializable {
     @FXML Label viewCodeLabel;
 
     public BlankController(String docID, String docName, String viewCode, String editCode,
-                           int mySiteID, BlockDLL blockDLL, boolean canEdit) {
+                           int mySiteID, BlockDLL blockDLL, boolean canEdit, String username) {
         this.docID = docID;
         this.editCode = editCode;
         this.viewCode = viewCode;
@@ -60,6 +61,7 @@ public class BlankController implements Initializable {
         this.blockDLL = blockDLL;
         this.canEdit = canEdit;
         this.docName = docName;
+        this.username = username;
 
         this.documentController = new EditorDocumentController(this);
         this.presenceController = new PresenceController(this, documentController);
@@ -67,7 +69,7 @@ public class BlankController implements Initializable {
     }
 
     public BlankController(BlockDLL blockDLL) {
-        this("local-doc", "N/A", "N/A", null, 0, blockDLL, true);
+        this("local-doc", "N/A", "N/A", null, 0, blockDLL, true, null);
     }
 
     @Override
@@ -195,6 +197,8 @@ public class BlankController implements Initializable {
     BlockDLL getBlockDLL() {
         return blockDLL;
     }
+
+    String getUsername() { return username; }
 
     EditorDocumentController getDocumentController() {
         return documentController;

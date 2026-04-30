@@ -36,7 +36,12 @@
 
 .body-pane {
     -fx-alignment: CENTER;
-    -fx-padding: 48;
+    -fx-padding: 32;
+}
+
+.body-scroll,
+.body-scroll > .viewport {
+    -fx-background-color: transparent;
 }
 
 .card {
@@ -45,7 +50,11 @@
     -fx-border-color: #e0ddd6;
     -fx-border-width: 0.5;
     -fx-border-radius: 12;
-    -fx-padding: 36 40 36 40;
+    -fx-padding: 24 40 24 40;
+}
+
+.auth-pane {
+    -fx-padding: 8 6 8 6;
 }
 
 .card-title {
@@ -58,7 +67,7 @@
 .card-sub {
     -fx-font-size: 14px;
     -fx-text-fill: #888780;
-    -fx-padding: 0 0 24 0;
+    -fx-padding: 0 0 12 0;
 }
 
 .btn-primary {

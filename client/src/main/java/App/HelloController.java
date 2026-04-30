@@ -44,6 +44,7 @@ public class HelloController {
     @FXML private Label loginStatusLabel;
 
     private int userId;
+    private String username;
 
     public HelloController(BlockDLL blockDLL) {
         this.blockDLL = blockDLL;
@@ -147,7 +148,7 @@ public class HelloController {
         // This is the key: we manually tell the loader how to build BlankController
         loader.setControllerFactory(type -> {
             if (type == BlankController.class) {
-                return new BlankController(docID, docName, viewCode, editCode, userId, this.blockDLL, canEdit);
+                return new BlankController(docID, docName, viewCode, editCode, userId, this.blockDLL, canEdit, username);
             }
             try {
                 return type.getDeclaredConstructor().newInstance();
@@ -298,6 +299,7 @@ public class HelloController {
         }
 
         userId = res.hashCode();
+        this.username = username;
         showSessionPane();
     }
 
@@ -331,6 +333,7 @@ public class HelloController {
 
         // returned user id is string but everything else is int based, so we hash it to get an int
         userId = res.hashCode();
+        this.username = username;
         showSessionPane();
     }
 

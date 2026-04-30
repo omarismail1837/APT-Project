@@ -19,6 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.datafaker.Faker;
+
 class PresenceController {
 
     private final BlankController host;
@@ -29,10 +31,13 @@ class PresenceController {
     private final Map<Integer, Integer> siteColorIndices = new HashMap<>();
     private final Map<Integer, Integer> currentlyTakenColors = new HashMap<>();
     private long lastCursorBroadcastMs = 0;
+    private final String username;
+
 
     PresenceController(BlankController host, EditorDocumentController documentController) {
         this.host = host;
         this.documentController = documentController;
+        username = host.getUsername();
     }
 
     void setupCaretListener() {
@@ -63,12 +68,6 @@ class PresenceController {
         assignColor(siteID);
         remoteCursorPositions.put(siteID, action.getStartCharID());
 
-        String extra = action.getExtraData();
-        if (extra != null && !extra.isBlank()) {
-            remoteUserNames.put(siteID, extra);
-        } else {
-            remoteUserNames.putIfAbsent(siteID, "User-" + Math.abs(siteID % 1000));
-        }
         host.withRemoteFlag(documentController::refreshUI);
     }
 
@@ -100,8 +99,11 @@ class PresenceController {
             remoteUserNames.put(siteID, extra);
 
         } else {
-            remoteUserNames.putIfAbsent(siteID, "User-" + Math.abs(siteID % 1000));
+            Faker faker = new Faker();
+            String animalName = faker.animal().name();
+            remoteUserNames.putIfAbsent(siteID, "Anonymous " + animalName);
         }
+        System.out.println("PRESENCE from " + siteID + " name=" + extra);
         host.withRemoteFlag(documentController::refreshUI);
         host.withRemoteFlag(this::updateActiveUsersPanel);
     }
@@ -116,14 +118,14 @@ class PresenceController {
         if (charID == null) return;
 
         Action action = new Action(host.nextClock(), now, host.getMySiteID(), host.getDocID(),
-                "CURSOR", charID, null, "User-" + (host.getMySiteID() % 1000));
+                "CURSOR", charID, null, username);
         host.getWsService().sendAction(action);
     }
 
     void broadcastPresence()
     {
         Action action = new Action(host.nextClock(), host.now(), host.getMySiteID(), host.getDocID(),
-                        "PRESENCE", null, null, "User-" + (host.getMySiteID() % 1000));
+                        "PRESENCE", null, null, username);
         host.getWsService().sendAction(action);
     }
 
@@ -152,28 +154,28 @@ class PresenceController {
     void updateActiveUsersPanel() {
         if (host.activeUsersBox == null) return;
         host.activeUsersBox.getChildren().clear();
-        String youcolor;
-        String youtext;
-        if (host.canEdit())
-        {
-            youcolor = "white"; youtext = "You";
-        }
-        else
-        {
-            youcolor = "gray"; youtext = "You (viewer)";
-        }
-        host.activeUsersBox.getChildren().add(makeUserRow(youtext, youcolor));
+        String youColor;
+        Faker f = new Faker();
+        String animal = f.animal().name();
+        String youText = username == null ? "Anonymous " + animal : username + " (You)";
+        boolean canEdit = host.canEdit();
+        if (canEdit) youColor = "white";
+        else youColor = "gray";
+        boolean viewer = !canEdit;
+
+        host.activeUsersBox.getChildren().add(makeUserRow(youText, youColor, viewer));
 
         List<Integer> activeSites = new ArrayList<>(remoteUserNames.keySet());
         Collections.sort(activeSites);
-        activeSites.stream()
-                .forEach(siteID -> {
-                    String name = remoteUserNames.getOrDefault(siteID, "User-" + Math.abs(siteID % 1000));
-                    String color = colorForSite(siteID);
-                    if (!remoteCursorPositions.containsKey(siteID))
-                        name = name + " (viewer)";
-                    host.activeUsersBox.getChildren().add(makeUserRow(name, color));
-                });
+        activeSites.forEach(siteID -> {
+            Faker faker = new Faker();
+            String animalName = faker.animal().name();
+
+            String name = remoteUserNames.getOrDefault(siteID, "Anonymous " + animalName);
+            String color = colorForSite(siteID);
+            boolean isViewer = !remoteCursorPositions.containsKey(siteID);
+            host.activeUsersBox.getChildren().add(makeUserRow(name, color, isViewer));
+        });
 
         if (host.connectedLabel != null) {
             host.connectedLabel.setText((1 + activeSites.size())
@@ -200,10 +202,6 @@ class PresenceController {
 
     void removeAllCarets() {
         new ArrayList<>(remoteCarets.keySet()).forEach(this::removeRemoteCaret);
-    }
-
-    String currentUserName() {
-        return remoteUserNames.getOrDefault(host.getMySiteID(), "User-" + (host.getMySiteID() % 1000));
     }
 
     private CaretNode createRemoteCaret(int siteID) {
@@ -240,15 +238,20 @@ class PresenceController {
         return BlankController.USER_COLORS[colorIndex];
     }
 
-    private HBox makeUserRow(String name, String color) {
+    private HBox makeUserRow(String name, String color, boolean isViewer) {
         Circle dot = new Circle(4);
         dot.setFill(Color.web(color));
         Label label = new Label(name);
-        label.setStyle("-fx-text-fill: #e0e0e0;");
+        if (isViewer) {
+            label.setStyle("-fx-text-fill: #808080; -fx-font-style: italic;");
+        } else {
+            label.setStyle("-fx-text-fill: #e0e0e0;");
+        }
         HBox row = new HBox(10, dot, label);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
     }
+
 
     private int assignColor(int siteID)
     {
