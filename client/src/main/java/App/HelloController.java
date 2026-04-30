@@ -282,6 +282,16 @@ public class HelloController {
     private void populateDocsPane(String response) {
         docsFlowPane.getChildren().clear();
         JSONArray arr = new JSONArray(response);
+
+        // fallback for when user doesnt have any docs
+        if (arr.isEmpty()) {
+            Label empty = new Label("You don't have any documents yet.\nCreate or import one to get started.");
+            empty.setStyle("-fx-text-fill: #888; -fx-font-size: 14px; -fx-text-alignment: center;");
+            empty.setWrapText(true);
+            docsFlowPane.getChildren().add(empty);
+            return;
+        }
+
         for (int i = 0; i < arr.length(); i++) {
             JSONObject doc = arr.getJSONObject(i);
             String docId = doc.getString("docId");
@@ -312,9 +322,20 @@ public class HelloController {
                 "-fx-padding: 6 10 6 10; -fx-cursor: hand;");
         deleteButton.setMaxWidth(Double.MAX_VALUE);
         deleteButton.setOnMouseClicked(e -> e.consume());
+
+        final boolean[] confirming = {false};
+
         deleteButton.setOnAction(e -> {
             e.consume();
-            deleteOwnedDocument(docId, name);
+            if (!confirming[0]) {
+                confirming[0] = true;
+                deleteButton.setText("Sure?");
+                deleteButton.setStyle("-fx-background-color: #fef2f2; -fx-text-fill: #b91c1c; " +
+                        "-fx-border-color: #b91c1c; -fx-border-radius: 6; -fx-background-radius: 6; " +
+                        "-fx-padding: 6 10 6 10; -fx-cursor: hand;");
+            } else {
+                deleteOwnedDocument(docId, name);
+            }
         });
 
         VBox card = new VBox(8, previewBox, nameLabel, deleteButton);
@@ -324,7 +345,6 @@ public class HelloController {
 
         card.setOnMouseClicked(e -> {
             if (editCode == null || editCode.isBlank()) return;
-            // currently user can only see the documents they own 
             try {
                 String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code="
                         + editCode + "&userId=" + userId;
@@ -335,13 +355,19 @@ public class HelloController {
             }
         });
 
-        // hover effect
         card.setOnMouseEntered(e -> card.setStyle(
                 "-fx-background-color: #f8f7f4; -fx-border-color: #378ADD; -fx-border-width: 1; " +
                         "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;"));
-        card.setOnMouseExited(e -> card.setStyle(
-                "-fx-background-color: white; -fx-border-color: #e0ddd6; -fx-border-width: 0.5; " +
-                        "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;"));
+
+        card.setOnMouseExited(e -> {
+            confirming[0] = false;
+            deleteButton.setText("Delete");
+            deleteButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #b91c1c; " +
+                    "-fx-border-color: #f1c5c5; -fx-border-radius: 6; -fx-background-radius: 6; " +
+                    "-fx-padding: 6 10 6 10; -fx-cursor: hand;");
+            card.setStyle("-fx-background-color: white; -fx-border-color: #e0ddd6; -fx-border-width: 0.5; " +
+                    "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;");
+        });
 
         return card;
     }
@@ -351,7 +377,7 @@ public class HelloController {
 
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("Delete document");
-        confirm.setHeaderText("Delete " + name + "?");
+        confirm.setHeaderText("Delete \"" + name + "\"?");
         confirm.setContentText("This permanently removes the document and its saved history.");
 
         if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
@@ -364,16 +390,25 @@ public class HelloController {
             conn.setRequestMethod("DELETE");
 
             int responseCode = conn.getResponseCode();
-            if (responseCode >= 200 && responseCode < 300) {
+            String body = readResponse(conn);
+
+            if (responseCode == 200) {
+                showBrowse(); // refresh the list
+            } else if (responseCode == 403) {
+                showImportAlert(Alert.AlertType.ERROR, "Not allowed",
+                        "You don't own this document and cannot delete it.");
+            } else if (responseCode == 400 && "not_found".equals(body)) {
+                showImportAlert(Alert.AlertType.ERROR, "Not found",
+                        "Document no longer exists. Refreshing.");
                 showBrowse();
             } else {
                 showImportAlert(Alert.AlertType.ERROR, "Delete failed",
-                        "Could not delete the document. Server returned HTTP " + responseCode + ".");
+                        "Server returned HTTP " + responseCode + ".");
             }
             conn.disconnect();
         } catch (IOException ex) {
             showImportAlert(Alert.AlertType.ERROR, "Delete failed",
-                    "Could not reach the server to delete the document.");
+                    "Could not reach the server.");
         }
     }
 
