@@ -41,9 +41,14 @@ public class HelloController {
     @FXML private PasswordField signupConfirmPasswordField;
     @FXML private PasswordField loginPasswordField;
     @FXML private VBox sessionPane;
+    @FXML private VBox authActionsPane;
     @FXML private VBox signupPane;
     @FXML private VBox loginPane;
     @FXML private VBox browsePane;
+    @FXML private Button browseDocsButton;
+    @FXML private Label welcomeTitleLabel;
+    @FXML private Label accountStatusLabel;
+    @FXML private Label loggedInLabel;
     @FXML private Label signupStatusLabel;
     @FXML private Label loginStatusLabel;
     @FXML private FlowPane docsFlowPane;
@@ -59,6 +64,7 @@ public class HelloController {
 
     @FXML
     public void initialize() {
+        updateSessionAccountUi();
         showSessionPane();
     }
 
@@ -389,6 +395,7 @@ public class HelloController {
     @FXML
     private void showSessionPane() {
         clearStatusLabels();
+        updateSessionAccountUi();
         setVisiblePane(sessionPane);
     }
 
@@ -429,7 +436,7 @@ public class HelloController {
         userId = res.hashCode();
         accountId = res;
         this.username = username;
-        showSessionPane();
+        returnToSessionToolsAfterAuth();
     }
 
     @FXML
@@ -438,7 +445,7 @@ public class HelloController {
         String password = loginPasswordField != null ? loginPasswordField.getText() : "";
 
         if (username.isBlank() || password.isBlank()) {
-            setLoginStatus("Enter your email and password.");
+            setLoginStatus("Enter your username and password.");
             return;
         }
 
@@ -451,7 +458,7 @@ public class HelloController {
 
         if (res.equals("does_not_exist"))
         {
-            setLoginStatus("No account found with that email.");
+            setLoginStatus("No account found with that username.");
             return;
         }
         else if (res.equals("incorrect_password"))
@@ -464,7 +471,7 @@ public class HelloController {
         userId = res.hashCode();
         accountId = res;
         this.username = username;
-        showSessionPane();
+        returnToSessionToolsAfterAuth();
     }
 
     private String sendAuthRequest(String endpoint, String username, String password) throws IOException {
@@ -565,5 +572,49 @@ public class HelloController {
         if (pane == null) return;
         pane.setVisible(visible);
         pane.setManaged(visible);
+    }
+
+    private void returnToSessionToolsAfterAuth() {
+        if (docsFlowPane != null) {
+            docsFlowPane.getChildren().clear();
+        }
+        clearStatusLabels();
+        updateSessionAccountUi();
+        setVisiblePane(sessionPane);
+
+        if (newDocNameField != null) {
+            javafx.application.Platform.runLater(() -> newDocNameField.requestFocus());
+        }
+    }
+
+    private void updateSessionAccountUi() {
+        boolean isLoggedIn = accountId != null && !accountId.isBlank();
+        String displayUsername = username == null || username.isBlank() ? "user" : username;
+
+        if (welcomeTitleLabel != null) {
+            welcomeTitleLabel.setText(isLoggedIn ? "Welcome, " + displayUsername : "Welcome");
+        }
+
+        if (accountStatusLabel != null) {
+            accountStatusLabel.setText(isLoggedIn
+                    ? "Start writing, browse your documents, or join an existing session."
+                    : "You're using anonymous mode. You can create or join sessions, but saved documents need an account.");
+        }
+
+        if (browseDocsButton != null) {
+            browseDocsButton.setVisible(isLoggedIn);
+            browseDocsButton.setManaged(isLoggedIn);
+        }
+
+        if (authActionsPane != null) {
+            authActionsPane.setVisible(!isLoggedIn);
+            authActionsPane.setManaged(!isLoggedIn);
+        }
+
+        if (loggedInLabel != null) {
+            loggedInLabel.setText(isLoggedIn ? "Logged in as " + displayUsername + "." : "");
+            loggedInLabel.setVisible(isLoggedIn);
+            loggedInLabel.setManaged(isLoggedIn);
+        }
     }
 }

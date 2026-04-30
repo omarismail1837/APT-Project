@@ -32,8 +32,12 @@
                 <VBox styleClass="card" spacing="10" maxWidth="420">
 
                 <VBox fx:id="sessionPane" spacing="10">
-                    <Label text="Welcome back" styleClass="card-title"/>
-                    <Label text="Start writing or join an existing session." styleClass="card-sub"/>
+                    <Label fx:id="welcomeTitleLabel" text="Welcome back" styleClass="card-title"/>
+                    <Label fx:id="accountStatusLabel"
+                           text=""
+                           wrapText="true"
+                           maxWidth="Infinity"
+                           styleClass="card-sub"/>
 
                     <HBox spacing="8">
                         <TextField fx:id="newDocNameField"
@@ -53,7 +57,8 @@
                             styleClass="btn-secondary"
                             maxWidth="Infinity"/>
 
-                    <Button text="Browse documents"
+                    <Button fx:id="browseDocsButton"
+                            text="Browse documents"
                             onAction="#showBrowse"
                             styleClass="btn-secondary"
                             maxWidth="Infinity"/>
@@ -76,16 +81,26 @@
                                 minWidth="110"/>
                     </HBox>
 
-                    <Button fx:id="showSignupButton"
-                            text="Create account"
-                            onAction="#showSignup"
-                            styleClass="btn-link"
-                            maxWidth="Infinity"/>
-                    <Button fx:id="showLoginButton"
-                            text="Log in"
-                            onAction="#showLogin"
-                            styleClass="btn-link"
-                            maxWidth="Infinity"/>
+                    <VBox fx:id="authActionsPane" spacing="4">
+                        <Button fx:id="showSignupButton"
+                                text="Create account"
+                                onAction="#showSignup"
+                                styleClass="btn-link"
+                                maxWidth="Infinity"/>
+                        <Button fx:id="showLoginButton"
+                                text="Log in"
+                                onAction="#showLogin"
+                                styleClass="btn-link"
+                                maxWidth="Infinity"/>
+                    </VBox>
+
+                    <Label fx:id="loggedInLabel"
+                           text=""
+                           visible="false"
+                           managed="false"
+                           wrapText="true"
+                           maxWidth="Infinity"
+                           styleClass="status-label"/>
                 </VBox>
 
                 <VBox fx:id="loginPane" spacing="10" visible="false" managed="false" styleClass="auth-pane">
