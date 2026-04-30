@@ -82,6 +82,7 @@ class SessionSyncController {
             if (host.getSeenActionIds().contains(actionId)) return;
 
             host.getSeenActionIds().add(actionId);
+            host.observeClock(action);
             host.getBlockDLL().applyAction(action);
             int caretSnapshot = host.textArea.getCaretPosition();
             int anchorSnapshot = host.textArea.getAnchor();

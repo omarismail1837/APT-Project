@@ -147,6 +147,11 @@ public class BlankController implements Initializable {
         return ++clock;
     }
 
+    void observeClock(Action action) {
+        if (action == null || action.getSiteID() != mySiteID) return;
+        clock = Math.max(clock, action.getClock());
+    }
+
     long now() {
         return System.currentTimeMillis();
     }
