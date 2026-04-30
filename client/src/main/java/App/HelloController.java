@@ -198,6 +198,8 @@ public class HelloController {
         }
 
         stage.setScene(scene);
+        stage.setMinWidth(1120);
+        stage.setMinHeight(720);
         stage.show();
     }
 

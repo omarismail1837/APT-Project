@@ -6,37 +6,37 @@
 
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="App.BlankController"
-            prefWidth="1000" prefHeight="700"
+            prefWidth="1220" prefHeight="760"
             style="-fx-background-color: #121212; -fx-padding: 15;">
 
     <center>
         <VBox VBox.vgrow="ALWAYS" fillWidth="true" style="-fx-background-color: #1e1e1e; -fx-background-radius: 8; -fx-border-color: #333; -fx-border-radius: 8; -fx-border-width: 1;">
 
-            <HBox alignment="CENTER_LEFT" spacing="15" style="-fx-padding: 10 20; -fx-border-color: transparent transparent #333 transparent; -fx-border-width: 1;">
+            <HBox alignment="CENTER_LEFT" spacing="12" minHeight="58" style="-fx-padding: 10 20; -fx-border-color: transparent transparent #333 transparent; -fx-border-width: 1;">
 
-                <HBox alignment="CENTER_LEFT" spacing="12" minWidth="310" prefWidth="340">
+                <HBox alignment="CENTER_LEFT" spacing="12" minWidth="150" prefWidth="210" maxWidth="240">
                     <VBox alignment="CENTER_LEFT" minWidth="0">
-                        <Label fx:id="nameLabel" text="documents.txt" textOverrun="ELLIPSIS" maxWidth="330" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 13;"/>
+                        <Label fx:id="nameLabel" text="documents.txt" textOverrun="ELLIPSIS" maxWidth="220" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 13;"/>
 <!--                        <Label fx:id="docIdLabel" maxWidth="330" style="-fx-text-fill: #666; -fx-font-family: 'monospace'; -fx-font-size: 10;" />-->
                     </VBox>
                 </HBox>
 
                 <Separator orientation="VERTICAL" prefHeight="25" style="-fx-opacity: 0.1;"/>
 
-                <VBox alignment="CENTER_LEFT" spacing="2" minWidth="210" prefWidth="310" maxWidth="310" HBox.hgrow="SOMETIMES">
+                <VBox alignment="CENTER_LEFT" spacing="2" minWidth="360" prefWidth="430" maxWidth="520" HBox.hgrow="ALWAYS">
                     <Label fx:id="editCodeLabel"
                            textOverrun="ELLIPSIS"
-                           maxWidth="300"
+                           maxWidth="500"
                            style="-fx-text-fill: #4ade80; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
                     <Label fx:id="viewCodeLabel"
                            textOverrun="ELLIPSIS"
-                           maxWidth="300"
+                           maxWidth="500"
                            style="-fx-text-fill: #93c5fd; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
                 </VBox>
 
                 <Region HBox.hgrow="ALWAYS" />
 
-                <HBox spacing="10" alignment="CENTER_RIGHT" minWidth="260">
+                <HBox spacing="8" alignment="CENTER_RIGHT" minWidth="470">
                     <HBox spacing="4">
                         <Button fx:id="boldButton" onAction="#toggleBold" text="B" styleClass="btn-format" style="-fx-font-weight: bold;"/>
                         <Button fx:id="italicButton" onAction="#toggleItalic" text="I" styleClass="btn-format" style="-fx-font-style: italic;"/>
@@ -45,11 +45,11 @@
                     <Separator orientation="VERTICAL" prefHeight="20" style="-fx-opacity: 0.1;"/>
 
                     <HBox spacing="6">
-                        <Button text="Undo" styleClass="btn-action"/>
-                        <Button text="Redo" styleClass="btn-action"/>
-                        <Button fx:id="exportButton" text="Export" onAction="#exportDocument" styleClass="btn-action" style="-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-border-color: #2563eb;"/>
-                        <Button fx:id="saveVersionButton" text="Save Version" onAction="#saveVersion" styleClass="btn-action" style="-fx-background-color: #22c55e; -fx-text-fill: white; -fx-border-color: #16a34a;"/>
-                        <Button fx:id="historyButton" text="History" onAction="#showHistory" styleClass="btn-action" style="-fx-background-color: #8b5cf6; -fx-text-fill: white; -fx-border-color: #7c3aed;"/>
+                        <Button text="Undo" styleClass="btn-action" minWidth="64"/>
+                        <Button text="Redo" styleClass="btn-action" minWidth="64"/>
+                        <Button fx:id="exportButton" text="Export" onAction="#exportDocument" styleClass="btn-action" minWidth="74" style="-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-border-color: #2563eb;"/>
+                        <Button fx:id="saveVersionButton" text="Save Version" onAction="#saveVersion" styleClass="btn-action" minWidth="106" style="-fx-background-color: #22c55e; -fx-text-fill: white; -fx-border-color: #16a34a;"/>
+                        <Button fx:id="historyButton" text="History" onAction="#showHistory" styleClass="btn-action" minWidth="78" style="-fx-background-color: #8b5cf6; -fx-text-fill: white; -fx-border-color: #7c3aed;"/>
                     </HBox>
                 </HBox>
             </HBox>
