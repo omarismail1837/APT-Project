@@ -169,6 +169,7 @@ public class ChatController {
             return "editor:" + editDoc.getDocId() + ":" + editDoc.getName() + ":"
                     + info.editCode + ":" + info.viewCode;
         }
+        // maybe later allow user to view documents they were a viewer in
         DocMetadata viewDoc = docRepository.findByViewCode(code);
         if (viewDoc != null) {
             SessionInfo info = new SessionInfo();
@@ -368,6 +369,24 @@ public class ChatController {
 
         return ResponseEntity.ok("restored");
     }
+
+    // allow a user to delete a document
+    @DeleteMapping("/docs/{docId}")
+    public ResponseEntity<String> deleteDoc(@PathVariable String docId, @RequestParam String accountId) {
+        DocMetadata doc = docRepository.findById(docId).orElse(null);
+        if (doc == null) {
+            return ResponseEntity.badRequest().body("not_found");
+        }
+        if (!doc.getOwnerId().equals(accountId)) {
+            return ResponseEntity.status(403).body("not_owner");
+        }
+        docRepository.deleteById(docId);
+        actionRepository.deleteByDocumentId(docId);
+        docVersionRepository.deleteByDocId(docId); // also delete any versions
+        sessions.remove(docId); // remove sessions if any
+        return ResponseEntity.ok("deleted");
+    }
+
 
     public static class VersionSaveRequest {
         private String label;
