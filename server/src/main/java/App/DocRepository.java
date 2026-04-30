@@ -11,10 +11,10 @@ import java.util.Optional;
 public interface DocRepository extends MongoRepository<DocMetadata, String> {
 
     // Used to find a document when a user joins with an Edit Code
-    Optional<DocMetadata> findByEditCode(String editCode);
+    DocMetadata findByEditCode(String editCode);
 
     // Used to find a document when a user joins with a View Code
-    Optional<DocMetadata> findByViewCode(String viewCode);
+    DocMetadata findByViewCode(String viewCode);
 
     // Helpful if you want to list all documents belonging to a specific user
     java.util.List<DocMetadata> findByOwnerId(String ownerId);

@@ -159,6 +159,30 @@ public class ChatController {
             System.out.println(info.viewers);
 
         }
+        // if not found in current sessions search in db
+        DocMetadata editDoc = docRepository.findByEditCode(code);
+        if (editDoc != null) {
+            SessionInfo info = new SessionInfo();
+            info.editCode = editDoc.getEditCode();
+            info.viewCode = editDoc.getViewCode();
+            info.editors.add(userId);
+            sessions.put(editDoc.getDocId(), info);
+            System.out.println("new editor: " + userId);
+            return "editor:" + editDoc.getDocId() + ":" + editDoc.getName() + ":"
+                    + info.editCode + ":" + info.viewCode;
+        }
+        DocMetadata viewDoc = docRepository.findByViewCode(code);
+        if (viewDoc != null) {
+            SessionInfo info = new SessionInfo();
+            info.editCode = viewDoc.getEditCode();
+            info.viewCode = viewDoc.getViewCode();
+            info.viewers.add(userId);
+            sessions.put(viewDoc.getDocId(), info);
+            System.out.println("new viewer: " + userId);
+            return "viewer:" + viewDoc.getDocId() + ":" + viewDoc.getName() + ":"
+                    + info.editCode + ":" + info.viewCode;
+        }
+        // not found in sessions or database
         return "invalid";
     }
 
