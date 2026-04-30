@@ -147,6 +147,7 @@ public class BlankController implements Initializable {
         return ++clock;
     }
 
+    // update clock propely when choosing a doc from browse docs
     void observeClock(Action action) {
         if (action == null || action.getSiteID() != mySiteID) return;
         clock = Math.max(clock, action.getClock());

@@ -287,11 +287,11 @@ public class HelloController {
             String docId = doc.getString("docId");
             String name = doc.getString("name");
             String editCode = doc.optString("editCode", null);
-            docsFlowPane.getChildren().add(makeDocCard(name, editCode));
+            docsFlowPane.getChildren().add(makeDocCard(docId, name, editCode));
         }
     }
 
-    private VBox makeDocCard(String name, String editCode) {
+    private VBox makeDocCard(String docId, String name, String editCode) {
         // preview area
         Label preview = new Label("Click to open");
         preview.setWrapText(true);
@@ -306,13 +306,25 @@ public class HelloController {
         nameLabel.setWrapText(true);
         nameLabel.setMaxWidth(140);
 
-        VBox card = new VBox(8, previewBox, nameLabel);
+        Button deleteButton = new Button("Delete");
+        deleteButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #b91c1c; " +
+                "-fx-border-color: #f1c5c5; -fx-border-radius: 6; -fx-background-radius: 6; " +
+                "-fx-padding: 6 10 6 10; -fx-cursor: hand;");
+        deleteButton.setMaxWidth(Double.MAX_VALUE);
+        deleteButton.setOnMouseClicked(e -> e.consume());
+        deleteButton.setOnAction(e -> {
+            e.consume();
+            deleteOwnedDocument(docId, name);
+        });
+
+        VBox card = new VBox(8, previewBox, nameLabel, deleteButton);
         card.setPrefWidth(156);
         card.setStyle("-fx-background-color: white; -fx-border-color: #e0ddd6; -fx-border-width: 0.5; " +
                 "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;");
 
         card.setOnMouseClicked(e -> {
             if (editCode == null || editCode.isBlank()) return;
+            // currently user can only see the documents they own 
             try {
                 String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code="
                         + editCode + "&userId=" + userId;
@@ -332,6 +344,37 @@ public class HelloController {
                         "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;"));
 
         return card;
+    }
+
+    private void deleteOwnedDocument(String docId, String name) {
+        if (docId == null || docId.isBlank() || accountId == null || accountId.isBlank()) return;
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Delete document");
+        confirm.setHeaderText("Delete " + name + "?");
+        confirm.setContentText("This permanently removes the document and its saved history.");
+
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+
+        try {
+            String encodedAccountId = URLEncoder.encode(accountId, StandardCharsets.UTF_8);
+            HttpURLConnection conn = (HttpURLConnection) new URL(
+                    "https://apt-project-production-326d.up.railway.app/docs/" + docId
+                            + "?accountId=" + encodedAccountId).openConnection();
+            conn.setRequestMethod("DELETE");
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode >= 200 && responseCode < 300) {
+                showBrowse();
+            } else {
+                showImportAlert(Alert.AlertType.ERROR, "Delete failed",
+                        "Could not delete the document. Server returned HTTP " + responseCode + ".");
+            }
+            conn.disconnect();
+        } catch (IOException ex) {
+            showImportAlert(Alert.AlertType.ERROR, "Delete failed",
+                    "Could not reach the server to delete the document.");
+        }
     }
 
     @FXML
