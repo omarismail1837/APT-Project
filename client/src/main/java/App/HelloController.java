@@ -317,33 +317,19 @@ public class HelloController {
         nameLabel.setMaxWidth(140);
 
         Button deleteButton = new Button("Delete");
-        deleteButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #b91c1c; " +
-                "-fx-border-color: #f1c5c5; -fx-border-radius: 6; -fx-background-radius: 6; " +
-                "-fx-padding: 6 10 6 10; -fx-cursor: hand;");
+        deleteButton.getStyleClass().add("delete-doc-button");
         deleteButton.setMaxWidth(Double.MAX_VALUE);
-        deleteButton.setOnMouseClicked(e -> e.consume());
-
-        final boolean[] confirming = {false};
 
         deleteButton.setOnAction(e -> {
             e.consume();
-            if (!confirming[0]) {
-                confirming[0] = true;
-                deleteButton.setText("Sure?");
-                deleteButton.setStyle("-fx-background-color: #fef2f2; -fx-text-fill: #b91c1c; " +
-                        "-fx-border-color: #b91c1c; -fx-border-radius: 6; -fx-background-radius: 6; " +
-                        "-fx-padding: 6 10 6 10; -fx-cursor: hand;");
-            } else {
-                deleteOwnedDocument(docId, name);
-            }
+            deleteOwnedDocument(docId, name);
         });
 
-        VBox card = new VBox(8, previewBox, nameLabel, deleteButton);
-        card.setPrefWidth(156);
-        card.setStyle("-fx-background-color: white; -fx-border-color: #e0ddd6; -fx-border-width: 0.5; " +
-                "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;");
+        VBox openCard = new VBox(8, previewBox, nameLabel);
+        openCard.getStyleClass().add("doc-open-card");
+        openCard.setPrefWidth(156);
 
-        card.setOnMouseClicked(e -> {
+        openCard.setOnMouseClicked(e -> {
             if (editCode == null || editCode.isBlank()) return;
             try {
                 String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code="
@@ -355,20 +341,8 @@ public class HelloController {
             }
         });
 
-        card.setOnMouseEntered(e -> card.setStyle(
-                "-fx-background-color: #f8f7f4; -fx-border-color: #378ADD; -fx-border-width: 1; " +
-                        "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;"));
-
-        card.setOnMouseExited(e -> {
-            confirming[0] = false;
-            deleteButton.setText("Delete");
-            deleteButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #b91c1c; " +
-                    "-fx-border-color: #f1c5c5; -fx-border-radius: 6; -fx-background-radius: 6; " +
-                    "-fx-padding: 6 10 6 10; -fx-cursor: hand;");
-            card.setStyle("-fx-background-color: white; -fx-border-color: #e0ddd6; -fx-border-width: 0.5; " +
-                    "-fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 10; -fx-cursor: hand;");
-        });
-
+        VBox card = new VBox(8, openCard, deleteButton);
+        card.setPrefWidth(156);
         return card;
     }
 

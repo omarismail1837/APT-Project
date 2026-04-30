@@ -156,3 +156,45 @@
     -fx-text-fill: #888780;
     -fx-padding: 4 0 6 0;
 }
+
+.doc-open-card {
+    -fx-background-color: white;
+    -fx-border-color: #e0ddd6;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10;
+    -fx-cursor: hand;
+}
+
+.doc-open-card:hover {
+    -fx-background-color: #f8f7f4;
+    -fx-border-color: #378ADD;
+    -fx-border-width: 1;
+}
+
+.delete-doc-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #b91c1c;
+    -fx-font-size: 13px;
+    -fx-alignment: center;
+    -fx-text-alignment: center;
+    -fx-border-color: #f1c5c5;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 7 10 7 10;
+    -fx-cursor: hand;
+}
+
+.delete-doc-button:hover {
+    -fx-background-color: #fee2e2;
+    -fx-border-color: #dc2626;
+    -fx-text-fill: #991b1b;
+}
+
+.delete-doc-button:pressed {
+    -fx-background-color: #dc2626;
+    -fx-border-color: #b91c1c;
+    -fx-text-fill: white;
+}
