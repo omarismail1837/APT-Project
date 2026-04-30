@@ -32,12 +32,14 @@ class PresenceController {
     private final Map<Integer, Integer> currentlyTakenColors = new HashMap<>();
     private long lastCursorBroadcastMs = 0;
     private final String username;
+    private final String displayName;
 
 
     PresenceController(BlankController host, EditorDocumentController documentController) {
         this.host = host;
         this.documentController = documentController;
         username = host.getUsername();
+        displayName = username != null ? username + " (You)" : "Anonymous " + new Faker().animal().name() + " (You)";
     }
 
     void setupCaretListener() {
@@ -99,9 +101,7 @@ class PresenceController {
             remoteUserNames.put(siteID, extra);
 
         } else {
-            Faker faker = new Faker();
-            String animalName = faker.animal().name();
-            remoteUserNames.putIfAbsent(siteID, "Anonymous " + animalName);
+            remoteUserNames.putIfAbsent(siteID, "Anonymous " + new Faker().animal().name());
         }
         System.out.println("PRESENCE from " + siteID + " name=" + extra);
         host.withRemoteFlag(documentController::refreshUI);
@@ -155,9 +155,7 @@ class PresenceController {
         if (host.activeUsersBox == null) return;
         host.activeUsersBox.getChildren().clear();
         String youColor;
-        Faker f = new Faker();
-        String animal = f.animal().name();
-        String youText = username == null ? "Anonymous " + animal : username + " (You)";
+        String youText = displayName;
         boolean canEdit = host.canEdit();
         if (canEdit) youColor = "white";
         else youColor = "gray";
@@ -168,10 +166,8 @@ class PresenceController {
         List<Integer> activeSites = new ArrayList<>(remoteUserNames.keySet());
         Collections.sort(activeSites);
         activeSites.forEach(siteID -> {
-            Faker faker = new Faker();
-            String animalName = faker.animal().name();
 
-            String name = remoteUserNames.getOrDefault(siteID, "Anonymous " + animalName);
+            String name = remoteUserNames.getOrDefault(siteID, displayName);
             String color = colorForSite(siteID);
             boolean isViewer = !remoteCursorPositions.containsKey(siteID);
             host.activeUsersBox.getChildren().add(makeUserRow(name, color, isViewer));

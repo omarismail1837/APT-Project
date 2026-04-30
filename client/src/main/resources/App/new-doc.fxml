@@ -17,7 +17,7 @@
                 <HBox alignment="CENTER_LEFT" spacing="12" minWidth="310" prefWidth="340">
                     <VBox alignment="CENTER_LEFT" minWidth="0">
                         <Label fx:id="nameLabel" text="documents.txt" textOverrun="ELLIPSIS" maxWidth="330" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 13;"/>
-                        <Label fx:id="docIdLabel" maxWidth="330" style="-fx-text-fill: #666; -fx-font-family: 'monospace'; -fx-font-size: 10;" />
+<!--                        <Label fx:id="docIdLabel" maxWidth="330" style="-fx-text-fill: #666; -fx-font-family: 'monospace'; -fx-font-size: 10;" />-->
                     </VBox>
                 </HBox>
 
