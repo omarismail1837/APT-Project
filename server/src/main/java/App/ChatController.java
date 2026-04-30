@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @Controller
@@ -22,20 +23,22 @@ public class ChatController {
     private final DocRepository docRepository;
     private final DocContentRepository docContentRepository;
     private final UserRepository userRepository;
+    private final DocVersionRepository docVersionRepository;
     private final Faker faker = new Faker();
     //needed to close session after 5 minutes of being empty
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     // Session info: docId -> SessionInfo
     private final Map<String, SessionInfo> sessions = new HashMap<>();
 
-    public ChatController(SimpMessagingTemplate messagingTemplate, ActionRepository actionRepository, DocRepository docRepository, DocContentRepository docContentRepository, UserRepository userRepository) {
+    public ChatController(SimpMessagingTemplate messagingTemplate, ActionRepository actionRepository, DocRepository docRepository, DocContentRepository docContentRepository, UserRepository userRepository,
+                          DocVersionRepository docVersionRepository) {
         this.messagingTemplate = messagingTemplate;
         this.actionRepository = actionRepository;
         this.docRepository = docRepository;
         this.docContentRepository = docContentRepository;
         this.userRepository = userRepository;
+        this.docVersionRepository = docVersionRepository;
     }
-
     private static class ContentSnapshot {
         private String content;
 
@@ -298,4 +301,106 @@ public class ChatController {
         return userRepository.findAll();
     }
 
+
+    //version history endpoints
+
+    @PostMapping("/docs/{documentId}/versions")
+    public ResponseEntity<DocVersion> saveVersion(
+            @PathVariable String documentId,
+            @RequestBody VersionSaveRequest req) {
+
+        List<Action> currentActions = actionRepository.findByDocumentId(documentId);
+
+        String label = (req.getLabel() == null || req.getLabel().isBlank())
+                ? "Version " + (docVersionRepository.findByDocIdOrderByCreatedAtDesc(documentId).size() + 1)
+                : req.getLabel();
+
+        String preview = req.getContent() == null ? "" : req.getContent();
+        if (preview.length() > 500) preview = preview.substring(0, 500) + "…";
+
+        String author = (req.getCreatedBy() == null || req.getCreatedBy().isBlank())
+                ? "Anonymous" : req.getCreatedBy();
+
+        DocVersion version = new DocVersion(documentId, label, currentActions, preview, author);
+        return ResponseEntity.ok(docVersionRepository.save(version));
+    }
+
+    @GetMapping("/docs/{documentId}/versions")
+    public ResponseEntity<List<VersionListItem>> listVersions(@PathVariable String documentId) {
+        List<DocVersion> versions = docVersionRepository.findByDocIdOrderByCreatedAtDesc(documentId);
+        List<VersionListItem> items = versions.stream()
+                .map(v -> new VersionListItem(v.getId(), v.getLabel(),
+                        v.getCreatedAt(), v.getCreatedBy(),
+                        v.getContentPreview(),
+                        v.getActions() == null ? 0 : v.getActions().size()))
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(items);
+    }
+
+    @PostMapping("/docs/{documentId}/versions/{versionId}/restore")
+    public ResponseEntity<String> restoreVersion(
+            @PathVariable String documentId,
+            @PathVariable String versionId) {
+
+        DocVersion version = docVersionRepository.findById(versionId).orElse(null);
+        if (version == null || !version.getDocId().equals(documentId)) {
+            return ResponseEntity.badRequest().body("Version not found");
+        }
+
+
+        actionRepository.deleteAll(actionRepository.findByDocumentId(documentId));
+
+        if (version.getActions() != null) {
+            actionRepository.saveAll(version.getActions());
+        }
+
+        DocContent docContent = docContentRepository.findById(documentId)
+                .orElseGet(() -> new DocContent(documentId, ""));
+        docContent.setContent(version.getContentPreview());
+        docContentRepository.save(docContent);
+        docRepository.updateLastModified(documentId, new Date());
+
+        Action restoreSignal = new Action();
+        restoreSignal.setActionType("RESTORE");
+        restoreSignal.setDocumentId(documentId);
+        restoreSignal.setExtraData(versionId);
+        messagingTemplate.convertAndSend("/topic/docs/" + documentId + "/updates", restoreSignal);
+
+        return ResponseEntity.ok("restored");
+    }
+
+    public static class VersionSaveRequest {
+        private String label;
+        private String createdBy;
+        private String content;
+        public String getLabel()     { return label; }
+        public String getCreatedBy() { return createdBy; }
+        public String getContent()   { return content; }
+        public void setLabel(String l)     { this.label = l; }
+        public void setCreatedBy(String u) { this.createdBy = u; }
+        public void setContent(String c)   { this.content = c; }
+    }
+
+    public static class VersionListItem {
+        private String id;
+        private String label;
+        private java.util.Date createdAt;
+        private String createdBy;
+        private String contentPreview;
+        private int actionCount;
+
+        public VersionListItem(String id, String label, java.util.Date createdAt,
+                               String createdBy, String contentPreview, int actionCount) {
+            this.id = id; this.label = label; this.createdAt = createdAt;
+            this.createdBy = createdBy; this.contentPreview = contentPreview;
+            this.actionCount = actionCount;
+        }
+
+        public String getId()             { return id; }
+        public String getLabel()          { return label; }
+        public java.util.Date getCreatedAt() { return createdAt; }
+        public String getCreatedBy()      { return createdBy; }
+        public String getContentPreview() { return contentPreview; }
+        public int    getActionCount()    { return actionCount; }
+    }
 }
