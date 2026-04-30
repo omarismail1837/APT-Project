@@ -9,8 +9,12 @@ import javafx.scene.control.IndexRange;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import org.fxmisc.richtext.model.RichTextChange;
+import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -43,6 +47,7 @@ class EditorDocumentController {
                         try {
                             rerender(caretSnapshot, caretSnapshot);
                             host.getPresenceController().broadcastCursorPosition(host.textArea.getCaretPosition(), true);
+                            saveContentSnapshot(host.textArea.getText());
                         } finally {
                             host.replaceRemoteUpdate(previousRemoteFlag);
                         }
@@ -92,6 +97,38 @@ class EditorDocumentController {
         if (host.getWsService() != null) {
             host.getWsService().sendAction(action);
         }
+    }
+
+    private void saveContentSnapshot(String content) {
+        String docId = host.getDocID();
+        if (docId == null || docId.isBlank()) return;
+
+        Thread snapshotThread = new Thread(() -> {
+            try {
+                URL url = new URL("https://apt-project-production-326d.up.railway.app/docs/"
+                        + docId + "/content");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("PUT");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+
+                JSONObject body = new JSONObject();
+                body.put("content", content == null ? "" : content);
+                try (OutputStream output = conn.getOutputStream()) {
+                    output.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                }
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode < 200 || responseCode >= 300) {
+                    System.err.println("Failed to save document snapshot: HTTP " + responseCode);
+                }
+                conn.disconnect();
+            } catch (IOException ex) {
+                System.err.println("Failed to save document snapshot: " + ex.getMessage());
+            }
+        }, "doc-content-snapshot");
+        snapshotThread.setDaemon(true);
+        snapshotThread.start();
     }
 
     void rerender(int preferredCaret, int preferredAnchor) {
