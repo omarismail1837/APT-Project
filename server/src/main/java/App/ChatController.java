@@ -20,6 +20,7 @@ public class ChatController {
     private final SimpMessagingTemplate messagingTemplate;
     private final ActionRepository actionRepository;
     private final DocRepository docRepository;
+    private final DocContentRepository docContentRepository;
     private final UserRepository userRepository;
     private final Faker faker = new Faker();
     //needed to close session after 5 minutes of being empty
@@ -27,11 +28,24 @@ public class ChatController {
     // Session info: docId -> SessionInfo
     private final Map<String, SessionInfo> sessions = new HashMap<>();
 
-    public ChatController(SimpMessagingTemplate messagingTemplate, ActionRepository actionRepository, DocRepository docRepository, UserRepository userRepository) {
+    public ChatController(SimpMessagingTemplate messagingTemplate, ActionRepository actionRepository, DocRepository docRepository, DocContentRepository docContentRepository, UserRepository userRepository) {
         this.messagingTemplate = messagingTemplate;
         this.actionRepository = actionRepository;
         this.docRepository = docRepository;
+        this.docContentRepository = docContentRepository;
         this.userRepository = userRepository;
+    }
+
+    private static class ContentSnapshot {
+        private String content;
+
+        public String getContent() {
+            return content;
+        }
+
+        public void setContent(String content) {
+            this.content = content;
+        }
     }
 
     // SessionInfo holds codes and lists of editors/viewers
@@ -257,6 +271,24 @@ public class ChatController {
     @GetMapping("/docs/{userId}")
     private List<DocMetadata> getDocs(@PathVariable String userId) {
         return docRepository.findByOwnerId(userId);
+    }
+
+    // server takes doc content from client via this endpoint
+    @PutMapping("/docs/{documentId}/content")
+    public void saveContentSnapshot(@PathVariable String documentId, @RequestBody ContentSnapshot snapshot) {
+        String content = snapshot == null || snapshot.getContent() == null ? "" : snapshot.getContent();
+        DocContent docContent = docContentRepository.findById(documentId)
+                .orElseGet(() -> new DocContent(documentId, ""));
+        docContent.setContent(content);
+        docContentRepository.save(docContent);
+        docRepository.updateLastModified(documentId, new Date());
+    }
+
+    // client gets doc content from server via this endpoint when they open a document from browse docs
+    @GetMapping("/docs/{documentId}/content")
+    public DocContent getContentSnapshot(@PathVariable String documentId) {
+        return docContentRepository.findById(documentId)
+                .orElseGet(() -> new DocContent(documentId, ""));
     }
 
     // temporary endpoint to view all users for testing only
