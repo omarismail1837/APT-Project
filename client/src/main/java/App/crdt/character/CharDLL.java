@@ -76,11 +76,29 @@ public class CharDLL implements ICRDT<CharNode> {
         // Will not remove from hashmap bec future inserts may still reference it as a parent
     }
 
+    public void undelete(String id) {
+        CharNode c = map.get(id);
+        if (c == null) return;
+        if (c.getIsDeleted() && c.getContent() == '\n') lineCount++;
+        c.undelete();
+    }
+
     public void deleteRange(String startID, String endID) {
         CharNode ptr = map.get(startID);
 
         while (ptr != null) {
             delete(ptr.getCharID());
+            if (endID != null && ptr.getCharID().equals(endID)) break;
+            ptr = ptr.getNext();
+        }
+
+    }
+
+    public void undeleteRange(String startID, String endID) {
+        CharNode ptr = map.get(startID);
+
+        while (ptr != null) {
+            undelete(ptr.getCharID());
             if (endID != null && ptr.getCharID().equals(endID)) break;
             ptr = ptr.getNext();
         }

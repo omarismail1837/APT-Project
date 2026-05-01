@@ -30,6 +30,7 @@ class EditorDocumentController {
     private final ArrayList<CharNode> visibleNodes = new ArrayList<>();
     private final UndoRedoManager undoRedoManager = new UndoRedoManager();
     private final java.util.List<Action> pendingUndoBatch = new java.util.ArrayList<>();
+    private final java.util.Map<String, String> redoRemapTable = new java.util.HashMap<>();
 
     EditorDocumentController(BlankController host) {
         this.host = host;
@@ -44,6 +45,7 @@ class EditorDocumentController {
     void resetHistory() {
         pendingUndoBatch.clear();
         undoRedoManager.clear();
+        redoRemapTable.clear();
     }
 
     void setupTextAreaListener() {
@@ -54,6 +56,7 @@ class EditorDocumentController {
                     changes.forEach(this::processRichChange);
                     if (!pendingUndoBatch.isEmpty()) {
                         undoRedoManager.pushUndo(new java.util.ArrayList<>(pendingUndoBatch));
+                        redoRemapTable.clear();
                     }
                     int caretSnapshot = host.textArea.getCaretPosition();
                     javafx.application.Platform.runLater(() -> {
@@ -311,6 +314,7 @@ class EditorDocumentController {
         pendingUndoBatch.clear();
         applyAndTrack(action);
         undoRedoManager.pushUndo(new ArrayList<>(pendingUndoBatch));
+        redoRemapTable.clear();
         pendingUndoBatch.clear();
         int caretSnapshot = host.textArea.getCaretPosition();
         int anchorSnapshot = host.textArea.getAnchor();
@@ -408,11 +412,10 @@ class EditorDocumentController {
         List<Action> batch = undoRedoManager.popRedo();
         if (batch == null) return;
 
-        java.util.Map<String, String> remappedCharIds = new java.util.HashMap<>();
         List<Action> reappliedBatch = new java.util.ArrayList<>();
 
         for (Action orig : batch) {
-            Action reinsertion = buildReinsertion(orig, remappedCharIds);
+            Action reinsertion = buildReinsertion(orig, redoRemapTable);
             if (reinsertion == null) continue;
             host.getBlockDLL().applyAction(reinsertion);
             host.getSeenActionIds().add(host.buildActionId(reinsertion));
@@ -420,7 +423,7 @@ class EditorDocumentController {
             reappliedBatch.add(reinsertion);
 
             if ("INSERT".equals(orig.getActionType())) {
-                remappedCharIds.put(originalCharID(orig), appliedCharID(reinsertion));
+                redoRemapTable.put(originalCharID(orig), appliedCharID(reinsertion));
             }
         }
 
@@ -437,20 +440,17 @@ class EditorDocumentController {
         String doc    = host.getDocID();
 
         switch (orig.getActionType()) {
-
             case "INSERT":
                 return new Action(newClock, now, site, doc,
                         "DELETE", appliedCharID(orig), null, null);
 
-            case "DELETE": {
-                App.crdt.character.CharNode node = findNodeByID(orig.getStartCharID());
-                if (node == null) return null;
-                App.crdt.character.CharNode prev = node.getPrev();
-                String parentID = (prev != null) ? prev.getCharID() : getSeedHeadID();
-                String charVal  = String.valueOf(node.getContent());
+            case "DELETE":
                 return new Action(newClock, now, site, doc,
-                        "INSERT", parentID, null, charVal);
-            }
+                        "UNDELETE", orig.getStartCharID(), null, null);
+
+            case "UNDELETE":
+                return new Action(newClock, now, site, doc,
+                        "DELETE", orig.getStartCharID(), null, null);
 
             case "BOLD":
             case "ITALIC": {
@@ -496,6 +496,10 @@ class EditorDocumentController {
             case "DELETE":
                 return new Action(newClock, now, site, doc,
                         "DELETE", remapCharID(orig.getStartCharID(), remappedCharIds), null, null);
+
+            case "UNDELETE":
+                return new Action(newClock, now, site, doc,
+                        "UNDELETE", remapCharID(orig.getStartCharID(), remappedCharIds), null, null);
 
             case "BOLD":
             case "ITALIC":

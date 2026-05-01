@@ -254,6 +254,52 @@ public class BlockDLL implements ICRDT<BlockNode> {
         automerge(blockID, siteID, clock, time);
     }
 
+    public void undeleteChar(String charID, int siteID, long clock, long time) {
+        System.out.println("[BlockDLL.undeleteChar] charID=" + charID);
+        String blockID = charBlockMap.get(charID);
+        if (blockID == null) {
+            System.out.println("[BlockDLL.undeleteChar] SKIP char not in charBlockMap");
+            return;
+        }
+
+        BlockNode block = map.get(blockID);
+        if (block == null) {
+            System.out.println("[BlockDLL.undeleteChar] SKIP block not in map blockID=" + blockID);
+            return;
+        }
+        block.getContent().undelete(charID);
+        System.out.println("[BlockDLL.undeleteChar] OK blockID=" + blockID);
+        autosplit(siteID, clock + 1, time, blockID);
+    }
+
+    public void undeleteChars(String startCharID, String endCharID, int siteID, long clock, long time) {
+        String startBlockID = charBlockMap.get(startCharID);
+        String endBlockID = charBlockMap.get(endCharID);
+        if (startBlockID == null || endBlockID == null) return;
+
+        BlockNode startBlockNode = map.get(startBlockID);
+        BlockNode endBlockNode = map.get(endBlockID);
+        if (startBlockNode == null || endBlockNode == null) return;
+
+        BlockNode currentBlock = startBlockNode;
+        String currentCharID = startCharID;
+
+        while (currentBlock != null) {
+            String startchar = (currentBlock == startBlockNode) ? startCharID : null;
+            String endchar = (currentBlock == endBlockNode) ? endCharID : null;
+            currentBlock.getContent().undeleteRange(startchar, endchar);
+            if (currentBlock == endBlockNode) break;
+            currentBlock = currentBlock.getNext();
+        }
+
+        currentBlock = startBlockNode;
+        while (currentBlock != null) {
+            autosplit(siteID, clock, time, currentBlock.getBlockID());
+            if (currentBlock.getBlockID() == endBlockID) break;
+            currentBlock = currentBlock.getNext();
+        }
+    }
+
     public void deleteChars(String startCharID, String endCharID, int siteID, long clock, long time) {
         String startBlockID = charBlockMap.get(startCharID);
         String endBlockID = charBlockMap.get(endCharID);
@@ -349,6 +395,14 @@ public class BlockDLL implements ICRDT<BlockNode> {
                     deleteChar(startCharID, siteID, clock, time);
                 } else {
                     deleteChars(startCharID, endCharID, siteID, clock, time);
+                }
+                break;
+
+            case "UNDELETE":
+                if (endCharID == null || endCharID.isBlank()) {
+                    undeleteChar(startCharID, siteID, clock, time);
+                } else {
+                    undeleteChars(startCharID, endCharID, siteID, clock, time);
                 }
                 break;
 

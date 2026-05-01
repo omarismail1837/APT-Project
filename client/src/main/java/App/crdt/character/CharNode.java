@@ -89,6 +89,7 @@ public class CharNode {
     public void setNext(CharNode n) { this.next = n; }
     public void setPrev(CharNode p) { this.prev = p; }
     public void delete() { this.isDeleted = true; } // Mark as tombstone
+    public void undelete() { this.isDeleted = false; }
     public void setBold(boolean bold) { this.isBold = bold; }
     public void setItalic(boolean italic) { this.isItalic = italic; }
     public void setDepth(int depth) { this.depth = depth; }
