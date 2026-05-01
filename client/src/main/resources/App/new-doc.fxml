@@ -65,17 +65,30 @@
                 </HBox>
             </HBox>
 
+            <!-- Main Content Area -->
             <HBox VBox.vgrow="ALWAYS">
                 <StyleClassedTextArea fx:id="textArea" VBox.vgrow="ALWAYS" HBox.hgrow="ALWAYS"
                                       wrapText="true"
                                       styleClass="styled-text-area"/>
 
+                <!-- Right Sidebar (User List + Back Button) -->
                 <VBox prefWidth="220" spacing="15" style="-fx-padding: 20; -fx-border-color: transparent transparent transparent #333; -fx-border-width: 1; -fx-background-color: #1a1a1a;">
                     <Label text="ACTIVE USERS" style="-fx-text-fill: #666; -fx-font-size: 10; -fx-font-weight: bold; -fx-letter-spacing: 1;"/>
-                    <VBox fx:id="activeUsersBox" spacing="12"/>
-                </VBox>
-            </HBox>
 
+                    <!-- Users growable area -->
+                    <VBox fx:id="activeUsersBox" spacing="12" VBox.vgrow="ALWAYS"/>
+
+                    <!-- Spacer to push button to the bottom -->
+                    <Region VBox.vgrow="ALWAYS" />
+
+                    <Button text="← Back to Dashboard"
+                            onAction="#handleBack"
+                            maxWidth="Infinity"
+                            style="-fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-border-color: #334155; -fx-border-radius: 5; -fx-cursor: hand; -fx-padding: 8; -fx-font-size: 12;"/>
+                </VBox>
+            </HBox> <!-- End of main content HBox -->
+
+            <!-- Bottom Status Bar -->
             <HBox spacing="20" alignment="CENTER_LEFT" style="-fx-padding: 8 15; -fx-background-color: #161616; -fx-background-radius: 0 0 8 8;">
                 <Label fx:id="lineColLabel" text="Line 1, Col 1" style="-fx-text-fill: #555; -fx-font-size: 11;"/>
                 <Region HBox.hgrow="ALWAYS" />

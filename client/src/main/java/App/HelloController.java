@@ -7,9 +7,8 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
-import javafx.scene.control.TextInputDialog;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.json.JSONArray;
@@ -19,7 +18,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -64,10 +62,22 @@ public class HelloController {
         userId = String.valueOf(Math.random() * 10000).hashCode();
     }
 
+    public HelloController(BlockDLL blockDLL, String accountId, String username) {
+        this.blockDLL = blockDLL;
+        this.accountId = accountId;
+        this.username = username;
+        this.userId = (accountId != null) ? accountId.hashCode() : String.valueOf(Math.random() * 10000).hashCode();
+    }
+
     @FXML
     public void initialize() {
         updateSessionAccountUi();
-        showSessionPane();
+        // Check if we are returning with a session
+        if (accountId != null && !accountId.isBlank()) {
+            setVisiblePane(sessionPane);
+        } else {
+            showSessionPane();
+        }
     }
 
     @FXML
@@ -162,7 +172,7 @@ public class HelloController {
         // This is the key: we manually tell the loader how to build BlankController
         loader.setControllerFactory(type -> {
             if (type == BlankController.class) {
-                return new BlankController(docID, docName, viewCode, editCode, userId, this.blockDLL, canEdit, username);
+                return new BlankController(docID, docName, viewCode, editCode, userId, this.blockDLL, canEdit, username, accountId);
             }
             try {
                 return type.getDeclaredConstructor().newInstance();

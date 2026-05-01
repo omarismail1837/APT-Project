@@ -10,7 +10,11 @@ import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.VBox;
 import org.fxmisc.richtext.StyleClassedTextArea;
-
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+import java.io.IOException;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.ResourceBundle;
@@ -25,6 +29,7 @@ public class BlankController implements Initializable {
 
     private final int mySiteID;
     private final String username;
+    private final String accountId;
     private String docName;
     private final BlockDLL blockDLL;
 
@@ -60,7 +65,7 @@ public class BlankController implements Initializable {
     @FXML Label viewCodeLabel;
 
     public BlankController(String docID, String docName, String viewCode, String editCode,
-                           int mySiteID, BlockDLL blockDLL, boolean canEdit, String username) {
+                           int mySiteID, BlockDLL blockDLL, boolean canEdit, String username, String accountId) {
         this.docID = docID;
         this.editCode = editCode;
         this.viewCode = viewCode;
@@ -69,6 +74,7 @@ public class BlankController implements Initializable {
         this.canEdit = canEdit;
         this.docName = docName;
         this.username = username;
+        this.accountId = accountId;
 
         this.documentController = new EditorDocumentController(this);
         this.presenceController = new PresenceController(this, documentController);
@@ -77,7 +83,7 @@ public class BlankController implements Initializable {
     }
 
     public BlankController(BlockDLL blockDLL) {
-        this("local-doc", "N/A", "N/A", null, 0, blockDLL, true, null);
+        this("local-doc", "N/A", "N/A", null, 0, blockDLL, true, null, null);
     }
 
     @Override
@@ -156,6 +162,47 @@ public class BlankController implements Initializable {
 
     @FXML
     private void copyViewCode() { copyToClipboard(viewCode);}
+
+    @FXML
+    private void handleBack() {
+        // 1. Clean up resources (disconnect WebSocket)
+        close();
+
+        try {
+            // 2. Load the Hello (Dashboard) view
+            URL fxmlUrl = getClass().getResource("/App/hello-view.fxml");
+            FXMLLoader loader = new FXMLLoader(fxmlUrl);
+
+            // 3. Set the Controller Factory to pass the blockDLL back to HelloController
+            loader.setControllerFactory(type -> {
+                if (type == HelloController.class) {
+                    return new HelloController(this.blockDLL, this.accountId, this.username);
+                }
+                try {
+                    return type.getDeclaredConstructor().newInstance();
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to load HelloController", e);
+                }
+            });
+
+            Parent root = loader.load();
+            Stage stage = (Stage) textArea.getScene().getWindow();
+
+            // 4. Update the scene
+            Scene scene = new Scene(root);
+
+            // Load the main CSS if applicable
+            URL cssUrl = getClass().getResource("/App/hello.css");
+            if (cssUrl != null) scene.getStylesheets().add(cssUrl.toExternalForm());
+
+            stage.setScene(scene);
+            stage.show();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            // Optional: Show an alert to the user if navigation fails
+        }
+    }
 
     private void copyToClipboard(String text) {
         if (text == null || text.isEmpty()) {
