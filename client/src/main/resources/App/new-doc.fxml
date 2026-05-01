@@ -45,8 +45,8 @@
                     <Separator orientation="VERTICAL" prefHeight="20" style="-fx-opacity: 0.1;"/>
 
                     <HBox spacing="6">
-                        <Button text="Undo" styleClass="btn-action" minWidth="64"/>
-                        <Button text="Redo" styleClass="btn-action" minWidth="64"/>
+                        <Button fx:id="undoButton" text="Undo" onAction="#undo" styleClass="btn-action" minWidth="64"/>
+                        <Button fx:id="redoButton" text="Redo" onAction="#redo" styleClass="btn-action" minWidth="64"/>
                         <Button fx:id="exportButton" text="Export" onAction="#exportDocument" styleClass="btn-action" minWidth="74" style="-fx-background-color: #3b82f6; -fx-text-fill: white; -fx-border-color: #2563eb;"/>
                         <Button fx:id="saveVersionButton" text="Save Version" onAction="#saveVersion" styleClass="btn-action" minWidth="106" style="-fx-background-color: #22c55e; -fx-text-fill: white; -fx-border-color: #16a34a;"/>
                         <Button fx:id="historyButton" text="History" onAction="#showHistory" styleClass="btn-action" minWidth="78" style="-fx-background-color: #8b5cf6; -fx-text-fill: white; -fx-border-color: #7c3aed;"/>

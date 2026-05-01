@@ -125,7 +125,10 @@ public class VersionHistoryController {
                     Thread t = new Thread(() -> {
                         boolean ok = postRestore(host.getDocID(), vId);
                         Platform.runLater(() -> {
-                            if (!ok) showError("Restore failed", "The server could not restore the version.");
+                            if (!ok) {
+                                showError("Restore failed", "The server could not restore the version.");
+                                return;
+                            }
                             host.handleRemoteRestore();
                         });
                     }, "restore-version");

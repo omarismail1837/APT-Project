@@ -49,6 +49,8 @@ public class BlankController implements Initializable {
     @FXML Button exportButton;
     @FXML Button saveVersionButton;
     @FXML Button historyButton;
+    @FXML Button undoButton;
+    @FXML Button redoButton;
     @FXML Label docIdLabel;
     @FXML Label lineColLabel;
     @FXML Label connectedLabel;
@@ -93,6 +95,8 @@ public class BlankController implements Initializable {
             textArea.setEditable(canEdit);
             boldButton.setDisable(!canEdit);
             italicButton.setDisable(!canEdit);
+            if (undoButton != null) undoButton.setDisable(!canEdit);
+            if (redoButton != null) redoButton.setDisable(!canEdit);
         }
 
         if (!canEdit) textArea.setStyle("-fx-caret-color: transparent;");
@@ -138,6 +142,12 @@ public class BlankController implements Initializable {
 
     @FXML
     private void showHistory() {versionHistoryController.showHistory();}
+
+    @FXML
+    private void undo() { documentController.undo(); }
+
+    @FXML
+    private void redo() { documentController.redo(); }
 
     public void close() {
         sessionSyncController.close();
