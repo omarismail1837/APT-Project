@@ -8,9 +8,12 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.IndexRange;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.fxmisc.richtext.model.RichTextChange;
 import org.json.JSONObject;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -178,7 +181,7 @@ class EditorDocumentController {
 
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Export document");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text files", "*.txt"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text files", "*.docx"));
         chooser.setInitialFileName(defaultExportFileName());
 
         java.nio.file.Path targetPath;
@@ -195,6 +198,46 @@ class EditorDocumentController {
 
         showExportAlert(Alert.AlertType.INFORMATION, "Export complete",
                 "Saved " + targetPath.getFileName() + " to your computer.");
+    }
+
+    void exportWordDocument() {
+        Window window = host.textArea != null && host.textArea.getScene() != null
+                ? host.textArea.getScene().getWindow()
+                : null;
+
+        if (window == null) {
+            showExportAlert(Alert.AlertType.ERROR, "Export failed", "The save dialog could not be opened.");
+            return;
+        }
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export document");
+        // Change filter to Word documents
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Word Documents", "*.docx"));
+        chooser.setInitialFileName(defaultExportFileName().replace(".txt", ".docx"));
+
+        java.io.File selectedFile = chooser.showSaveDialog(window);
+        if (selectedFile == null) return;
+
+        // Use Try-with-resources to ensure the document and stream close properly
+        try (XWPFDocument doc = new XWPFDocument();
+             FileOutputStream out = new FileOutputStream(selectedFile)) {
+
+            // 1. Create the paragraph that will hold your text
+            XWPFParagraph paragraph = doc.createParagraph();
+
+            // 2. Call your new formatting function to fill the paragraph with runs
+            host.getBlockDLL().collectFormattedText(paragraph);
+
+            // 3. Write the actual file data
+            doc.write(out);
+
+            showExportAlert(Alert.AlertType.INFORMATION, "Export complete",
+                    "Saved " + selectedFile.getName() + " to your computer.");
+
+        } catch (IOException ex) {
+            showExportAlert(Alert.AlertType.ERROR, "Export failed", "Could not save the Word file.");
+        }
     }
 
     int resolveTextAreaIndexForCharID(String charID) {

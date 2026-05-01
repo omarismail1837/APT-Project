@@ -134,7 +134,7 @@ public class BlankController implements Initializable {
 
     @FXML
     private void exportDocument() {
-        documentController.exportDocument();
+        documentController.exportWordDocument();
     }
 
     @FXML

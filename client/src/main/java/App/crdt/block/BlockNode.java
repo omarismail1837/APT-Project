@@ -1,6 +1,7 @@
 package App.crdt.block;
 
 import App.crdt.character.CharDLL;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 
 public class BlockNode {
     private final String blockID;
@@ -65,5 +66,9 @@ public class BlockNode {
             return this.siteID < other.siteID;
         }
         return this.blockID.compareTo(other.blockID) < 0;
+    }
+
+    public void collectFormattedText(XWPFParagraph text) {
+       content.collectFormattedText(text);
     }
 }

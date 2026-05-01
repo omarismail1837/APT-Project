@@ -5,6 +5,8 @@ import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
 import App.crdt.character.ICRDT;
 import org.springframework.stereotype.Service;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
 
 import java.util.HashMap;
 import java.util.List;
@@ -111,6 +113,16 @@ public class BlockDLL implements ICRDT<BlockNode> {
             ptr = ptr.getNext();
         }
         return text.toString();
+    }
+
+    public void collectFormattedText(XWPFParagraph text) {
+        BlockNode ptr = head.getNext();
+        while (ptr != null) {
+            if (!ptr.isDeleted()) {
+                ptr.collectFormattedText(text);
+            }
+            ptr = ptr.getNext();
+        }
     }
 
     public BlockNode getBlock(String blockID) {

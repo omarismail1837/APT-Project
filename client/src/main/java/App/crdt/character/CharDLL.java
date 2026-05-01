@@ -2,6 +2,8 @@ package App.crdt.character;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
 
 import java.util.*;
 
@@ -336,4 +338,33 @@ public class CharDLL implements ICRDT<CharNode> {
         return allKeys.toArray(new String[0]);
     }
 
+    public void collectFormattedText(XWPFParagraph text) {
+        CharNode ptr = head.getNext();
+        XWPFParagraph currentParagraph = text;
+
+        while (ptr != null) {
+            // advance over deleted characters but preserve structure
+            if (!ptr.getIsDeleted()) {
+                char c = ptr.getContent();
+
+                // Newline: start a new paragraph
+                if (c == '\n') {
+                    // createParagraph is available on XWPFDocument via paragraph.getDocument()
+                    try {
+                        currentParagraph = currentParagraph.getDocument().createParagraph();
+                    } catch (Exception e) {
+                        // Fallback: if unable to create a new paragraph, append a newline char
+                        XWPFRun run = currentParagraph.createRun();
+                        run.setText("\n");
+                    }
+                } else {
+                    XWPFRun run = currentParagraph.createRun();
+                    run.setText(String.valueOf(c));
+                    run.setBold(ptr.getBold());
+                    run.setItalic(ptr.getItalic());
+                }
+            }
+            ptr = ptr.getNext();
+        }
+    }
 }
