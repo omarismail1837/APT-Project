@@ -2,6 +2,7 @@ package App;
 
 import App.crdt.action.Action;
 import net.datafaker.Faker;
+import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -13,7 +14,6 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import org.springframework.http.ResponseEntity;
 
 @RestController
 @Controller
@@ -387,6 +387,36 @@ public class ChatController {
         return ResponseEntity.ok("deleted");
     }
 
+    //allow user to rename document
+    @PostMapping("/docs/{docId}/rename")
+    public ResponseEntity<String> renameDoc(@PathVariable String docId, @RequestParam String accountId, @RequestParam String newName) {
+        DocMetadata doc = docRepository.findById(docId).orElse(null);
+        if (doc == null) {
+            return ResponseEntity.badRequest().body("not_found");
+        }
+        if (!doc.getOwnerId().equals(accountId)) {
+            return ResponseEntity.status(403).body("not_owner");
+        }
+        doc.setName(newName);
+        docRepository.save(doc);
+
+        //check active sessions
+        if (sessions.containsKey(docId)) {
+            SessionInfo info = sessions.get(docId);
+            // Broadcast a message to update the document name in the UI
+            Action renameSignal = new Action();
+            renameSignal.setActionType("RENAME");
+            renameSignal.setDocumentId(docId);
+            renameSignal.setTime(System.currentTimeMillis());
+            renameSignal.setClock(0); // clock is irrelevant for rename signals
+            renameSignal.setSiteID(0); // siteID is irrelevant for rename signals
+            renameSignal.setExtraData(newName);
+            messagingTemplate.convertAndSend("/topic/docs/" + docId + "/updates", renameSignal);
+        }
+
+        return ResponseEntity.ok("renamed");
+
+    }
 
     public static class VersionSaveRequest {
         private String label;
