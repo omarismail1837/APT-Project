@@ -6,6 +6,8 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.VBox;
 import org.fxmisc.richtext.StyleClassedTextArea;
 
@@ -148,6 +150,28 @@ public class BlankController implements Initializable {
 
     @FXML
     private void redo() { documentController.redo(); }
+
+    @FXML
+    private void copyEditCode() { copyToClipboard(editCode); }
+
+    @FXML
+    private void copyViewCode() { copyToClipboard(viewCode);}
+
+    private void copyToClipboard(String text) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+
+        final Clipboard clipboard = Clipboard.getSystemClipboard();
+        final ClipboardContent content = new ClipboardContent();
+
+        content.putString(text);
+        clipboard.setContent(content);
+
+        // Optional: Add a console log or UI feedback (like a temporary tooltip)
+        // to confirm the copy was successful.
+        System.out.println("Copied to clipboard: " + text);
+    }
 
     public void close() {
         sessionSyncController.close();

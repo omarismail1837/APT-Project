@@ -17,21 +17,32 @@
                 <HBox alignment="CENTER_LEFT" spacing="12" minWidth="150" prefWidth="210" maxWidth="240">
                     <VBox alignment="CENTER_LEFT" minWidth="0">
                         <Label fx:id="nameLabel" text="documents.txt" textOverrun="ELLIPSIS" maxWidth="220" style="-fx-text-fill: #e0e0e0; -fx-font-weight: bold; -fx-font-size: 13;"/>
-<!--                        <Label fx:id="docIdLabel" maxWidth="330" style="-fx-text-fill: #666; -fx-font-family: 'monospace'; -fx-font-size: 10;" />-->
+                        <!--                        <Label fx:id="docIdLabel" maxWidth="330" style="-fx-text-fill: #666; -fx-font-family: 'monospace'; -fx-font-size: 10;" />-->
                     </VBox>
                 </HBox>
 
                 <Separator orientation="VERTICAL" prefHeight="25" style="-fx-opacity: 0.1;"/>
 
-                <VBox alignment="CENTER_LEFT" spacing="2" minWidth="360" prefWidth="430" maxWidth="520" HBox.hgrow="ALWAYS">
-                    <Label fx:id="editCodeLabel"
-                           textOverrun="ELLIPSIS"
-                           maxWidth="500"
-                           style="-fx-text-fill: #4ade80; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
-                    <Label fx:id="viewCodeLabel"
-                           textOverrun="ELLIPSIS"
-                           maxWidth="500"
-                           style="-fx-text-fill: #93c5fd; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
+                <VBox alignment="CENTER_LEFT" spacing="4" minWidth="360" prefWidth="430" maxWidth="520" HBox.hgrow="ALWAYS">
+                    <!-- Edit Code Row -->
+                    <HBox alignment="CENTER_LEFT" spacing="8">
+                        <Label fx:id="editCodeLabel"
+                               textOverrun="ELLIPSIS"
+                               maxWidth="450"
+                               style="-fx-text-fill: #4ade80; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
+                        <Button text="⮺" onAction="#copyEditCode"
+                                style="-fx-font-size: 10; -fx-padding: 1 5; -fx-background-color: transparent; -fx-text-fill: #4ade80; -fx-border-color: #4ade80; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand; -fx-opacity: 0.8;" />
+                    </HBox>
+
+                    <!-- View Code Row -->
+                    <HBox alignment="CENTER_LEFT" spacing="8">
+                        <Label fx:id="viewCodeLabel"
+                               textOverrun="ELLIPSIS"
+                               maxWidth="450"
+                               style="-fx-text-fill: #93c5fd; -fx-font-family: 'monospace'; -fx-font-size: 11;" />
+                        <Button text="⮺" onAction="#copyViewCode"
+                                style="-fx-font-size: 10; -fx-padding: 1 5; -fx-background-color: transparent; -fx-text-fill: #93c5fd; -fx-border-color: #93c5fd; -fx-border-radius: 3; -fx-background-radius: 3; -fx-cursor: hand; -fx-opacity: 0.8;" />
+                    </HBox>
                 </VBox>
 
                 <Region HBox.hgrow="ALWAYS" />
