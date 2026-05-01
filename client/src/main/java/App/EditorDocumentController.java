@@ -333,7 +333,7 @@ class EditorDocumentController {
         }
         return getSeedHeadID();
     }
-    // ── called instead of applyAndSend for local edits, so actions are batched for undo ──
+
     private void applyAndTrack(Action action) {
         host.getBlockDLL().applyAction(action);
         host.getSeenActionIds().add(host.buildActionId(action));
@@ -347,7 +347,6 @@ class EditorDocumentController {
         List<Action> batch = undoRedoManager.popUndo();
         if (batch == null) return;
 
-        // Reverse order: undo newest action first (right-to-left for multi-char)
         for (int i = batch.size() - 1; i >= 0; i--) {
             Action inv = buildInverse(batch.get(i));
             if (inv == null) continue;
@@ -356,7 +355,6 @@ class EditorDocumentController {
             if (host.getWsService() != null) host.getWsService().sendAction(inv);
         }
 
-        // Push the ORIGINALS (not the inverses) onto redo
         undoRedoManager.pushRedo(batch);
 
         int caret = host.textArea.getCaretPosition();
@@ -370,8 +368,6 @@ class EditorDocumentController {
         java.util.Map<String, String> remappedCharIds = new java.util.HashMap<>();
         List<Action> reappliedBatch = new java.util.ArrayList<>();
 
-        // Forward order: re-apply originals oldest → newest, remapping any
-        // parent IDs that point to chars recreated earlier in this same redo.
         for (Action orig : batch) {
             Action reinsertion = buildReinsertion(orig, remappedCharIds);
             if (reinsertion == null) continue;
@@ -385,8 +381,6 @@ class EditorDocumentController {
             }
         }
 
-        // Push the ACTUAL re-applied actions onto undo so a later undo can
-        // target the recreated characters rather than the pre-undo originals.
         undoRedoManager.pushUndoKeepRedo(reappliedBatch);
 
         int caret = host.textArea.getCaretPosition();
@@ -453,14 +447,10 @@ class EditorDocumentController {
 
         switch (orig.getActionType()) {
             case "INSERT":
-                // Recreate the character after the corresponding parent in the
-                // current document, remapping the parent if that parent was also
-                // recreated earlier in this redo batch.
                 return new Action(newClock, now, site, doc,
                         "INSERT", remapCharID(orig.getStartCharID(), remappedCharIds), null, orig.getExtraData());
 
             case "DELETE":
-                // Re-tombstone the original charID (still in the CRDT)
                 return new Action(newClock, now, site, doc,
                         "DELETE", remapCharID(orig.getStartCharID(), remappedCharIds), null, null);
 
