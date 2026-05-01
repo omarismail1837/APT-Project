@@ -8,6 +8,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
+import javafx.scene.control.TextInputDialog;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.json.JSONArray;
@@ -333,6 +335,65 @@ public class HelloController {
             deleteOwnedDocument(docId, name);
         });
 
+        Button renameButton = new Button("Rename");
+        renameButton.getStyleClass().add("rename-doc-button");
+        renameButton.setMaxWidth(Double.MAX_VALUE);
+
+        // Only show rename when user is logged in (server will validate ownership)
+        boolean canAttemptRename = accountId != null && !accountId.isBlank();
+        renameButton.setVisible(canAttemptRename);
+        renameButton.setManaged(canAttemptRename);
+
+        renameButton.setOnAction(e -> {
+            e.consume();
+            // use the current displayed name (may have changed) as the dialog default
+            String currentDisplayedName = nameLabel.getText() == null ? name : nameLabel.getText();
+            TextInputDialog dialog = new TextInputDialog(currentDisplayedName);
+            dialog.setTitle("Rename document");
+            dialog.setHeaderText(null);
+            dialog.setContentText("New name:");
+            java.util.Optional<String> result = dialog.showAndWait();
+            if (result.isEmpty()) return;
+            String newName = result.get().trim();
+            if (newName.isEmpty()) {
+                showImportAlert(Alert.AlertType.ERROR, "Rename failed", "Name cannot be empty.");
+                return;
+            }
+
+            // Perform network call off the FX thread
+            new Thread(() -> {
+                try {
+                    String encodedAccount = URLEncoder.encode(accountId == null ? "" : accountId, StandardCharsets.UTF_8);
+                    String encodedNewName = URLEncoder.encode(newName, StandardCharsets.UTF_8);
+                    String encodedDocId = URLEncoder.encode(docId, StandardCharsets.UTF_8);
+                    URL url = new URL("https://apt-project-production-326d.up.railway.app/docs/" + encodedDocId + "/rename?accountId=" + encodedAccount + "&newName=" + encodedNewName);
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setDoOutput(true);
+
+                    int responseCode = conn.getResponseCode();
+                    String body = readResponse(conn);
+                    conn.disconnect();
+
+                    javafx.application.Platform.runLater(() -> {
+                        if (responseCode == 200) {
+                            nameLabel.setText(newName);
+                            showImportAlert(Alert.AlertType.INFORMATION, "Renamed", "Document renamed.");
+                        } else if (responseCode == 403) {
+                            showImportAlert(Alert.AlertType.ERROR, "Not allowed", "You don't own this document and cannot rename it.");
+                        } else if (responseCode == 400 && "not_found".equals(body)) {
+                            showImportAlert(Alert.AlertType.ERROR, "Not found", "Document no longer exists. Refreshing.");
+                            showBrowse();
+                        } else {
+                            showImportAlert(Alert.AlertType.ERROR, "Rename failed", "Server returned HTTP " + responseCode + ".");
+                        }
+                    });
+                } catch (IOException ex) {
+                    javafx.application.Platform.runLater(() -> showImportAlert(Alert.AlertType.ERROR, "Rename failed", "Could not reach the server."));
+                }
+            }, "rename-doc-thread").start();
+        });
+
         VBox openCard = new VBox(8, previewBox, nameLabel);
         openCard.getStyleClass().add("doc-open-card");
         openCard.setPrefWidth(156);
@@ -349,7 +410,8 @@ public class HelloController {
             }
         });
 
-        VBox card = new VBox(8, openCard, deleteButton);
+        HBox actionsBox = new HBox(8, renameButton, deleteButton);
+        VBox card = new VBox(8, openCard, actionsBox);
         card.setPrefWidth(156);
         return card;
     }

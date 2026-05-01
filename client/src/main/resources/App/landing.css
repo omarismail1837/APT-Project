@@ -198,3 +198,31 @@
     -fx-border-color: #b91c1c;
     -fx-text-fill: white;
 }
+
+/* Rename button: same sizing and shape as delete but with blue styling */
+.rename-doc-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #185FA5;
+    -fx-font-size: 13px;
+    -fx-alignment: center;
+    -fx-text-alignment: center;
+    -fx-border-color: #cfe6fb;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 7 10 7 10;
+    -fx-cursor: hand;
+}
+
+.rename-doc-button:hover {
+    -fx-background-color: #e6f3ff;
+    -fx-border-color: #378ADD;
+    -fx-text-fill: #0f4a86;
+}
+
+.rename-doc-button:pressed {
+    -fx-background-color: #1A6DB8;
+    -fx-border-color: #144f8a;
+    -fx-text-fill: white;
+}
+

@@ -88,6 +88,11 @@ class SessionSyncController {
             int anchorSnapshot = host.textArea.getAnchor();
             documentController.rerender(caretSnapshot, anchorSnapshot);
         }
+        if ("RENAME".equals(type)) {
+            host.handleRemoteRename(action.getExtraData());
+            return;
+        }
+
     }
 
     void close() {

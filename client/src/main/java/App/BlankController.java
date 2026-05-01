@@ -23,7 +23,7 @@ public class BlankController implements Initializable {
 
     private final int mySiteID;
     private final String username;
-    private final String docName;
+    private String docName;
     private final BlockDLL blockDLL;
 
     private long clock = 0;
@@ -252,5 +252,9 @@ public class BlankController implements Initializable {
                 wsService.resubscribeInitialState(docID);
             }
         });
+    }
+    public void handleRemoteRename(String newName) {
+        docName = newName;
+        if (nameLabel != null) nameLabel.setText(docName + ".txt");
     }
 }
