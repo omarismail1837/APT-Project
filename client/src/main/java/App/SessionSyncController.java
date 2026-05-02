@@ -76,7 +76,8 @@ class SessionSyncController {
         if ("INSERT".equals(type)
                 || "DELETE".equals(type)
                 || "BOLD".equals(type)
-                || "ITALIC".equals(type)) {
+                || "ITALIC".equals(type)
+                || "UNDELETE".equals(type)){
 
             String actionId = host.buildActionId(action);
             if (host.getSeenActionIds().contains(actionId)) return;
