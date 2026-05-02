@@ -58,6 +58,7 @@ public class BlankController implements Initializable {
     @FXML Button historyButton;
     @FXML Button undoButton;
     @FXML Button redoButton;
+    @FXML Button copyEditButton;
     @FXML Label docIdLabel;
     @FXML Label lineColLabel;
     @FXML Label connectedLabel;
@@ -105,10 +106,16 @@ public class BlankController implements Initializable {
             italicButton.setDisable(!canEdit);
             if (undoButton != null) undoButton.setDisable(!canEdit);
             if (redoButton != null) redoButton.setDisable(!canEdit);
+            if (copyEditButton != null) copyEditButton.setVisible(canEdit);
+            if (saveVersionButton != null) saveVersionButton.setDisable(!canEdit);
+            if (historyButton != null) historyButton.setDisable(!canEdit);
         }
 
         if (!canEdit) textArea.setStyle("-fx-caret-color: transparent;");
         else presenceController.setUpLocalCaretColor();
+
+
+
 
         setupCodeLabels();
         presenceController.updateActiveUsersPanel();
