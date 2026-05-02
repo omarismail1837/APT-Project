@@ -1,6 +1,7 @@
 package App;
 
 import App.crdt.action.Action;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -8,6 +9,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Path;
+import javafx.util.Duration;
 import org.fxmisc.richtext.Caret;
 import org.fxmisc.richtext.CaretNode;
 import org.fxmisc.richtext.model.TwoDimensional;
@@ -20,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 
 import net.datafaker.Faker;
+
+import static java.time.Duration.*;
 
 class PresenceController {
 
@@ -208,7 +212,15 @@ class PresenceController {
         caret.setManaged(false);
         caret.setMouseTransparent(true);
         caret.setFocusTraversable(false);
+
+        // make remote carets not blink
+        caret.visibleProperty().addListener((obs, oldVal, newVal) -> {
+            if (!newVal) caret.setVisible(true);
+        });
+
         host.textArea.addCaret(caret);
+        caret.setBlinkRate(Duration.ZERO);
+
         return caret;
     }
 
