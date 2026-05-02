@@ -105,7 +105,7 @@
 
                 <VBox fx:id="loginPane" spacing="10" visible="false" managed="false" styleClass="auth-pane">
                     <Label text="Log in" styleClass="card-title"/>
-                    <Label text="Use your local profile to continue into the workspace." styleClass="card-sub"/>
+                    <Label text="Use your local profile to continue into the workspace." styleClass="card-sub" wrapText="true"/>
 
                     <TextField fx:id="loginUsernameField"
                                promptText="Username"
