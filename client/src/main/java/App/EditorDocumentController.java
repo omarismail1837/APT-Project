@@ -62,7 +62,6 @@ class EditorDocumentController {
                     javafx.application.Platform.runLater(() -> {
                         rerender(caretSnapshot, caretSnapshot);
                         host.getPresenceController().broadcastCursorPosition(host.textArea.getCaretPosition(), true);
-                        saveContentSnapshot(host.textArea.getText());
                     });
                 });
     }
@@ -84,6 +83,7 @@ class EditorDocumentController {
             }
             refreshMapping();
         }
+        host.getPresenceController().setLastDeletionStart(idx);
 
         if (!change.getInserted().getText().isEmpty()) {
             String seedID = getSeedHeadID();
@@ -111,38 +111,6 @@ class EditorDocumentController {
         }
     }
 
-    private void saveContentSnapshot(String content) {
-        String docId = host.getDocID();
-        if (docId == null || docId.isBlank()) return;
-
-        Thread snapshotThread = new Thread(() -> {
-            try {
-                URL url = new URL("https://apt-project-production-326d.up.railway.app/docs/"
-                        + docId + "/content");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("PUT");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setDoOutput(true);
-
-                JSONObject body = new JSONObject();
-                body.put("content", content == null ? "" : content);
-                try (OutputStream output = conn.getOutputStream()) {
-                    output.write(body.toString().getBytes(StandardCharsets.UTF_8));
-                }
-
-                int responseCode = conn.getResponseCode();
-                if (responseCode < 200 || responseCode >= 300) {
-                    System.err.println("Failed to save document snapshot: HTTP " + responseCode);
-                }
-                conn.disconnect();
-            } catch (IOException ex) {
-                System.err.println("Failed to save document snapshot: " + ex.getMessage());
-            }
-        }, "doc-content-snapshot");
-        snapshotThread.setDaemon(true);
-        snapshotThread.start();
-    }
-
     void rerender(int preferredCaret, int preferredAnchor) {
         host.withRemoteFlag(() -> {
             refreshMapping();
@@ -161,7 +129,8 @@ class EditorDocumentController {
         int docLength = host.textArea.getLength();
         for (int i = 0; i < visibleNodes.size() && i < docLength; i++) {
             CharNode node = visibleNodes.get(i);
-            host.textArea.setStyleClass(i, i + 1, resolveBaseClass(node));
+            String styleClass = resolveBaseClass(node);
+            host.textArea.setStyleClass(i, i + 1, styleClass);
         }
     }
 
@@ -171,6 +140,10 @@ class EditorDocumentController {
 
     void toggleItalic() {
         applyFormattingAction("ITALIC", CharNode::getItalic);
+    }
+
+    void highlight() {
+        applyFormattingAction("HIGHLIGHT", CharNode::getHighlighted);
     }
 
     void exportDocument() {
@@ -254,14 +227,15 @@ class EditorDocumentController {
             }
         }
 
-        return host.textArea.getLength();
+        return -1; // character was deleted
     }
 
     String resolveCharIDForCaret(int caretPos) {
         if (visibleNodes.isEmpty()) return getSeedHeadID();
         if (caretPos <= 0) return getSeedHeadID();
 
-        int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
+        int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1; // already has this
+        if (anchorIndex < 0 || anchorIndex >= visibleNodes.size()) return getSeedHeadID(); // add this
         return visibleNodes.get(anchorIndex).getCharID();
     }
 
@@ -343,10 +317,13 @@ class EditorDocumentController {
     }
 
     private String resolveBaseClass(CharNode node) {
-        if (node.getBold() && node.getItalic()) return "bold-italic";
-        if (node.getBold()) return "bold";
-        if (node.getItalic()) return "italic";
-        return "regular";
+        String base;
+        if (node.getBold() && node.getItalic()) base = "bold-italic";
+        else if (node.getBold()) base = "bold";
+        else if (node.getItalic()) base = "italic";
+        else base = "regular";
+
+        return node.getHighlighted() ? base + "-highlighted" : base;
     }
 
     private void ensureSeedBlock() {
@@ -453,7 +430,8 @@ class EditorDocumentController {
                         "DELETE", orig.getStartCharID(), null, null);
 
             case "BOLD":
-            case "ITALIC": {
+            case "ITALIC":
+            case "HIGHLIGHT": {
                 String flipped = "true".equalsIgnoreCase(orig.getExtraData()) ? "false" : "true";
                 return new Action(newClock, now, site, doc,
                         orig.getActionType(),
@@ -527,5 +505,11 @@ class EditorDocumentController {
     private String appliedCharID(Action action) {
         if (action == null) return null;
         return action.getSiteID() + "-" + action.getClock();
+    }
+
+    // for commentcontroller
+    CharNode getVisibleNode(int index) {
+        if (index < 0 || index >= visibleNodes.size()) return null;
+        return visibleNodes.get(index);
     }
 }

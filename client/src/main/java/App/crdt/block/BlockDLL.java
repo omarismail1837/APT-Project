@@ -21,6 +21,8 @@ public class BlockDLL implements ICRDT<BlockNode> {
     private final HashMap<String, String> charBlockMap;
     private List<Action> allActions;
     private Set<String> appliedActionIds;
+    private final List<Action> pendingActions = new ArrayList<>();
+    private static final int MAX_PENDING_DRAIN_PASSES = 5;
 
     public BlockDLL() {
         head = new BlockNode();
@@ -378,9 +380,62 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (appliedActionIds.contains(actionId)) {
             return;
         }
+        if (!canApplyAction(update)) {
+            pendingActions.add(update);
+            return;
+        }
+
         appliedActionIds.add(actionId);
         allActions.add(update);
+        applyActionInternal(update);
+        drainPendingActions();
+    }
 
+    private boolean canApplyAction(Action update) {
+        String startCharID = update.getStartCharID();
+        String endCharID = update.getEndCharID();
+        String type = update.getActionType();
+
+        switch (type) {
+            case "INSERT":
+                return startCharID != null && charBlockMap.containsKey(startCharID);
+            case "DELETE":
+            case "UNDELETE":
+            case "BOLD":
+            case "ITALIC":
+                if (startCharID == null || !charBlockMap.containsKey(startCharID)) return false;
+                if (endCharID != null && !endCharID.isBlank() && !charBlockMap.containsKey(endCharID)) return false;
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    private void drainPendingActions() {
+        if (pendingActions.isEmpty()) return;
+        for (int pass = 0; pass < MAX_PENDING_DRAIN_PASSES; pass++) {
+            boolean appliedAny = false;
+            for (int i = 0; i < pendingActions.size(); i++) {
+                Action pending = pendingActions.get(i);
+                String pendingId = buildActionId(pending);
+                if (appliedActionIds.contains(pendingId)) {
+                    pendingActions.remove(i--);
+                    continue;
+                }
+                if (!canApplyAction(pending)) {
+                    continue;
+                }
+                appliedActionIds.add(pendingId);
+                allActions.add(pending);
+                applyActionInternal(pending);
+                pendingActions.remove(i--);
+                appliedAny = true;
+            }
+            if (!appliedAny) break;
+        }
+    }
+
+    private void applyActionInternal(Action update) {
         String startCharID = update.getStartCharID();
         String endCharID = update.getEndCharID();
         String extraData = update.getExtraData();
@@ -423,6 +478,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
             case "ITALIC":
                 setIsItalicRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
                 break;
+
+            case "HIGHLIGHT":
+                setIsHighlightedRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
+                break;
+
 
             default:
                 break;
@@ -477,6 +537,29 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
     }
 
+    private void setIsHighlightedRange(String startCharID, String endCharID, boolean highlighted) {
+        String startBlockID = charBlockMap.get(startCharID);
+        String endBlockID = charBlockMap.get(endCharID);
+        if (startBlockID == null || endBlockID == null) return;
+
+        BlockNode startBlockNode = map.get(startBlockID);
+        BlockNode endBlockNode = map.get(endBlockID);
+        if (startBlockNode == null || endBlockNode == null) return;
+
+        BlockNode currentBlock = startBlockNode;
+
+        while (currentBlock != null) {
+            String startChar = currentBlock == startBlockNode ? startCharID : null;
+            String endChar = currentBlock == endBlockNode ? endCharID : null;
+
+            currentBlock.getContent().highlightRange(startChar, endChar, highlighted);
+
+            if (currentBlock == endBlockNode) break;
+            currentBlock = currentBlock.getNext();
+        }
+    }
+
+
     public List<Action> getAllActions() {
         ensureActionsListInitialized();
         return new ArrayList<>(allActions);
@@ -500,5 +583,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         map.put("ROOT", head);
         if (allActions != null) allActions.clear();
         if (appliedActionIds != null) appliedActionIds.clear();
+        pendingActions.clear();
     }
 }
+

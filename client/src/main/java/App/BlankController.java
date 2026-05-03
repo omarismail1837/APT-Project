@@ -93,14 +93,17 @@ public class BlankController implements Initializable {
         this("local-doc", "N/A", "N/A", null, 0, blockDLL, true, null, null);
     }
 
+    public CommentController getCommentController() { return commentController; }
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         documentController.initializeDocument();
         documentController.setupTextAreaListener();
-        if (canEdit) presenceController.setupCaretListener();
+        if (canEdit) {
+            presenceController.setupCaretListener();
+            commentController.rightClickListener();
+        }
         setupUI();
         setupKeybindings();
-        commentController.rightClickListener();
         sessionSyncController.setupWebSocket();
     }
 
