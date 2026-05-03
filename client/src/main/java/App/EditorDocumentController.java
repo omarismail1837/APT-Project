@@ -462,7 +462,8 @@ class EditorDocumentController {
                         "DELETE", orig.getStartCharID(), null, null);
 
             case "BOLD":
-            case "ITALIC": {
+            case "ITALIC":
+            case "HIGHLIGHT": {
                 String flipped = "true".equalsIgnoreCase(orig.getExtraData()) ? "false" : "true";
                 return new Action(newClock, now, site, doc,
                         orig.getActionType(),

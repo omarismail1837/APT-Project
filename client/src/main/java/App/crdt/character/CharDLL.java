@@ -386,4 +386,14 @@ public class CharDLL implements ICRDT<CharNode> {
             ptr = ptr.getNext();
         }
     }
+    public void highlightRange(String startChar, String endChar, boolean highlighted) {
+        CharNode ptr = startChar == null ? head.getNext() : map.get(startChar);
+
+        while (ptr != null) {
+            ptr.setHighlighted(highlighted);
+            if (endChar != null && ptr.getCharID().equals(endChar)) break;
+            ptr = ptr.getNext();
+        }
+    }
+
 }

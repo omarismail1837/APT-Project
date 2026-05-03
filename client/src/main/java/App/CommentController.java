@@ -1,6 +1,5 @@
 package App;
 
-import App.crdt.action.Action;
 import App.crdt.character.CharNode;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -15,7 +14,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
 import static io.micrometer.common.util.StringUtils.truncate;
@@ -101,15 +99,8 @@ public class CommentController {
                 String key = start + "-" + end;
                 comments.put(key, text);
                 // highlight the annotated range
-                for (int i = start; i < end; i++) {
-                    System.out.println("highlighting index " + i);
-                    CharNode node = host.getDocumentController().getVisibleNode(i);
-                    if (node != null) {
-                        System.out.println("the node is null!");
-                        node.setHighlighted(true);
-                    }
-                }
-                host.getDocumentController().rerender(host.textArea.getCaretPosition(), host.textArea.getAnchor());
+                host.textArea.selectRange(start, end);
+                host.getDocumentController().highlight();
             }
             dialog.close();
             // refresh sidebar here inshallah

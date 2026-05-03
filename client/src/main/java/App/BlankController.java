@@ -98,10 +98,12 @@ public class BlankController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         documentController.initializeDocument();
         documentController.setupTextAreaListener();
-        if (canEdit) presenceController.setupCaretListener();
+        if (canEdit) {
+            presenceController.setupCaretListener();
+            commentController.rightClickListener();
+        }
         setupUI();
         setupKeybindings();
-        commentController.rightClickListener();
         sessionSyncController.setupWebSocket();
     }
 
