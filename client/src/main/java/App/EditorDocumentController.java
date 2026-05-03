@@ -516,18 +516,14 @@ class EditorDocumentController {
         pendingUndoBatch.clear();
 
         try {
-            // 1. Insert text via textArea — listener fires, adds INSERT actions
-            //    to pendingUndoBatch but won't push (suppressed)
             host.textArea.replaceText(replaceStart, replaceEnd, text);
         } finally {
-            // runLater so the listener's own runLater (rerender) has settled first
             javafx.application.Platform.runLater(() -> {
                 try {
                     // 2. Apply formatting — adds BOLD/ITALIC actions to same batch
                     if (snapshot != null && !snapshot.isEmpty()) {
                         int insertEnd = replaceStart + text.length();
                         applyFormattingSnapshot(replaceStart, insertEnd, snapshot, false);
-                        // applyFormattingSnapshot calls rerender, that's fine
                     }
                 } finally {
                     // 3. Push the entire batch as ONE undo entry
