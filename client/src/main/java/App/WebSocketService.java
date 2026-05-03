@@ -185,7 +185,7 @@ public class WebSocketService {
                 }
 
                 // subscribeToTopics handles both the initial-state replay and live
-                // buffering for first-connect AND reconnect alike. Calling it once is sufficient do NOT call resubscribeInitialState() on top of this.
+                // buffering for first connect and reconnect. Calling it once is sufficient
                 subscribeToTopics();
 
                 if (!wasReconnect && onConnected != null) {
@@ -237,8 +237,6 @@ public class WebSocketService {
                     boolean accepted = bufferedLiveUpdates.offer(action);
                     if (!accepted) {
                         System.err.println("[WS] Buffer full! Dropping update or forcing Live mode.");
-                        // Strategy: If buffer is full, we must stop buffering and force live
-                        // to prevent data loss, even if history isn't perfect.
                         switchToLiveMode();
                     }
                 } else {
@@ -281,16 +279,14 @@ public class WebSocketService {
                             onActionReceived.accept(a);
                         }
 
-                        // Reconciliation: find actions this client sent that the server never persisted.
+                        //find actions
                         if (!localActionLog.isEmpty()) {
                             Set<String> confirmed = new HashSet<>();
                             for (Action a : actions) {
                                 confirmed.add(a.getSiteID() + "-" + a.getClock());
                             }
 
-                            // Also exclude anything already sitting in pendingActions —
-                            // those are offline-typed and haven't been sent yet, so they
-                            // are correctly absent from history. Don't double-queue them.
+                            // exclude anything already sitting in pendingActions
                             Set<String> alreadyQueued = new HashSet<>();
                             for (Action a : pendingActions) {
                                 alreadyQueued.add(a.getSiteID() + "-" + a.getClock());
@@ -336,16 +332,15 @@ public class WebSocketService {
             onActionReceived.accept(queued);
         }
         if (historyApplied) {
-            // Send any local edits that were made while disconnected.
+            // Send any local edits made when disconnected
             flushPendingActions();
         }
-        // Only now — after remote edits are applied and local edits are sent —
-        // notify the UI that the reconnect is complete and re-broadcast presence.
-        reconnecting = false; // live mode restored — direct sends are safe again
+
+        // notify the ui reconnect is complete and re-broadcast presence
+        reconnecting = false; // live mode restored
         if (pendingReconnect) {
             pendingReconnect = false;
-            // Re-broadcast presence so the server's presences map is updated and
-            // other clients see this user as online again.
+
             if (onConnected != null) onConnected.run();
             if (onReconnected != null) onReconnected.run();
         }
@@ -355,8 +350,6 @@ public class WebSocketService {
         if (action == null) return;
         action.setDocumentId(this.docID);
 
-        // Log every local action so we can detect server-side loss on reconnect.
-        // Skip ephemeral actions that aren't persisted on the server anyway.
         String type = action.getActionType();
         if (!type.equals("CURSOR") && !type.equals("CURSOR_REMOVE")
                 && !type.equals("PRESENCE") && !type.equals("DISCONNECT")) {
