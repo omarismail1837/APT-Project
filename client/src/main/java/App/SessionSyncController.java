@@ -148,6 +148,9 @@ class SessionSyncController {
                 }, "ws-disconnect-thread").start();
             }
             presenceController.removeAllCarets();
+            host.getBlockDLL().clear();
+            host.getSeenActionIds().clear();
+            documentController.initializeDocument();
         } catch (Exception ex) {
             System.err.println("Error while closing BlankController: " + ex.getMessage());
         }

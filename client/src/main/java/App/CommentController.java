@@ -1,13 +1,8 @@
 package App;
 
-import App.crdt.character.CharNode;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.TextArea;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -17,19 +12,9 @@ import javafx.stage.Stage;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static io.micrometer.common.util.StringUtils.truncate;
-
 public class CommentController {
     private final BlankController host;
     private final Map<String, Comment> comments = new LinkedHashMap<>();
-    private static class Comment {
-        String username;
-        String text;
-        Comment(String username, String text) {
-            this.username = username;
-            this.text = text;
-        }
-    }
 
     CommentController(BlankController host) {
         this.host = host;
@@ -109,6 +94,7 @@ public class CommentController {
                 comments.put(key, new Comment(host.getPresenceController().getDisplayName(), text));                // highlight the annotated range
                 host.textArea.selectRange(start, end);
                 host.getDocumentController().highlight();
+                host.textArea.deselect();
                 refreshCommentsSidebar();
             }
 
@@ -144,6 +130,7 @@ public class CommentController {
         comments.put(start + "-" + end, new Comment(senderName, commentText));
         host.textArea.selectRange(start, end);
         host.getDocumentController().highlight();
+        host.textArea.deselect();
         refreshCommentsSidebar();
     }
 
