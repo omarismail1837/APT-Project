@@ -157,21 +157,13 @@ public class BlankController implements Initializable {
         String text = clipboard.getString();
         if (text == null || text.isEmpty()) return;
 
-        List<boolean[]> formatSnapshot = clipboardStyling;
-        // clear after use so external pastes don't accidentally inherit it
+        List<boolean[]> snapshot = clipboardStyling;
         clipboardStyling = null;
 
         IndexRange selection = textArea.getSelection();
-        textArea.replaceText(selection.getStart(), selection.getEnd(), text);
-
-        if (formatSnapshot != null && !formatSnapshot.isEmpty()) {
-            final List<boolean[]> snapshot = formatSnapshot;
-            final int insertStart = selection.getStart();
-            final int insertEnd = insertStart + text.length();
-            javafx.application.Platform.runLater(() ->
-                    documentController.applyFormattingSnapshot(insertStart, insertEnd, snapshot)
-            );
-        }
+        documentController.pasteWithFormatting(
+                selection.getStart(), selection.getEnd(), text, snapshot
+        );
     }
 
     private void setupUI() {
