@@ -28,6 +28,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
         // Increase limits to handle large initial state batches
+        System.out.println("is config even being loaded??");
         registration.setMessageSizeLimit(2 * 1024 * 1024); // 2MB max per message
         registration.setSendBufferSizeLimit(4 * 1024 * 1024); // 4MB total buffer
         registration.setSendTimeLimit(20000); // Allow 20s for slow clients
