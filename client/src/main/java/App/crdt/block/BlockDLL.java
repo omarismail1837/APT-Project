@@ -4,15 +4,10 @@ import App.crdt.action.Action;
 import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
 import App.crdt.character.ICRDT;
-import org.springframework.stereotype.Service;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class BlockDLL implements ICRDT<BlockNode> {
@@ -21,6 +16,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
     private final HashMap<String, String> charBlockMap;
     private List<Action> allActions;
     private Set<String> appliedActionIds;
+    private final List<Action> pendingActions = new ArrayList<>();
 
     public BlockDLL() {
         head = new BlockNode();
@@ -378,9 +374,62 @@ public class BlockDLL implements ICRDT<BlockNode> {
         if (appliedActionIds.contains(actionId)) {
             return;
         }
+        if (!canApplyAction(update)) {
+            pendingActions.add(update);
+            return;
+        }
+
         appliedActionIds.add(actionId);
         allActions.add(update);
+        applyActionInternal(update);
+        drainPendingActions();
+    }
 
+    private boolean canApplyAction(Action update) {
+        String startCharID = update.getStartCharID();
+        String endCharID = update.getEndCharID();
+        String type = update.getActionType();
+
+        switch (type) {
+            case "INSERT":
+                return startCharID != null && charBlockMap.containsKey(startCharID);
+            case "DELETE":
+            case "UNDELETE":
+            case "BOLD":
+            case "ITALIC":
+                if (startCharID == null || !charBlockMap.containsKey(startCharID)) return false;
+                if (endCharID != null && !endCharID.isBlank() && !charBlockMap.containsKey(endCharID)) return false;
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    private void drainPendingActions() {
+        if (pendingActions.isEmpty()) return;
+        boolean appliedAny;
+        do {
+            appliedAny = false;
+            for (int i = 0; i < pendingActions.size(); i++) {
+                Action pending = pendingActions.get(i);
+                String pendingId = buildActionId(pending);
+                if (appliedActionIds.contains(pendingId)) {
+                    pendingActions.remove(i--);
+                    continue;
+                }
+                if (!canApplyAction(pending)) {
+                    continue;
+                }
+                appliedActionIds.add(pendingId);
+                allActions.add(pending);
+                applyActionInternal(pending);
+                pendingActions.remove(i--);
+                appliedAny = true;
+            }
+        } while (appliedAny && !pendingActions.isEmpty());
+    }
+
+    private void applyActionInternal(Action update) {
         String startCharID = update.getStartCharID();
         String endCharID = update.getEndCharID();
         String extraData = update.getExtraData();
@@ -528,5 +577,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
         map.put("ROOT", head);
         if (allActions != null) allActions.clear();
         if (appliedActionIds != null) appliedActionIds.clear();
+        pendingActions.clear();
     }
 }
+
