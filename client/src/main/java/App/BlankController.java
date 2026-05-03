@@ -51,6 +51,7 @@ public class BlankController implements Initializable {
     private final PresenceController presenceController;
     private final SessionSyncController sessionSyncController;
     private final VersionHistoryController versionHistoryController;
+    private final CommentController commentController;
 
     @FXML Label nameLabel;
     @FXML VBox activeUsersBox;
@@ -85,6 +86,7 @@ public class BlankController implements Initializable {
         this.presenceController = new PresenceController(this, documentController);
         this.sessionSyncController = new SessionSyncController(this, documentController, presenceController);
         this.versionHistoryController = new VersionHistoryController(this, documentController);
+        this.commentController = new CommentController(this);
     }
 
     public BlankController(BlockDLL blockDLL) {
@@ -98,6 +100,7 @@ public class BlankController implements Initializable {
         if (canEdit) presenceController.setupCaretListener();
         setupUI();
         setupKeybindings();
+        commentController.rightClickListener();
         sessionSyncController.setupWebSocket();
     }
 
