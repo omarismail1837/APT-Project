@@ -69,6 +69,7 @@ public class BlankController implements Initializable {
     @FXML Label connectedLabel;
     @FXML Label editCodeLabel;
     @FXML Label viewCodeLabel;
+    @FXML VBox commentsBox;
 
     public BlankController(String docID, String docName, String viewCode, String editCode,
                            int mySiteID, BlockDLL blockDLL, boolean canEdit, String username, String accountId) {
