@@ -38,6 +38,7 @@ public class WebSocketService {
     private static final long[] BACKOFF_DELAYS_MS = {2000, 5000, 10000, 20000, 30000}; // so all clients dont reconnect at same instant
 
     private volatile boolean intentionalDisconnect = false;
+    private volatile boolean reconnecting = false; // true from transport drop until live mode restored
     private volatile long disconnectedAt = -1;
     private volatile int reconnectAttempts = 0;
     private String lastUrl;
@@ -170,7 +171,12 @@ public class WebSocketService {
 
             @Override
             public void handleTransportError(StompSession s, Throwable ex) {
+                if (session != null && s != session) {
+                    System.out.println("[WS] Ignoring stale transport error from old session");
+                    return;
+                }
                 System.err.println("[WS] Transport error: " + ex.getMessage());
+                reconnecting = true;
                 session = null;
                 if (!intentionalDisconnect) {
                     handleUnexpectedDisconnect();
@@ -182,6 +188,7 @@ public class WebSocketService {
     private void subscribeToTopics() {
         if (session == null) return;
         replayState.set(1);
+        bufferedLiveUpdates.clear();
 
         // SAFETY VALVE: If history isn't received in 5s, force live mode anyway
         scheduler.schedule(() -> {
@@ -264,9 +271,13 @@ public class WebSocketService {
         // Send any local edits that were made while disconnected.
         flushPendingActions();
         // Only now — after remote edits are applied and local edits are sent —
-        // notify the UI that the reconnect is complete.
+        // notify the UI that the reconnect is complete and re-broadcast presence.
+        reconnecting = false; // live mode restored — direct sends are safe again
         if (pendingReconnect) {
             pendingReconnect = false;
+            // Re-broadcast presence so the server's presences map is updated and
+            // other clients see this user as online again.
+            if (onConnected != null) onConnected.run();
             if (onReconnected != null) onReconnected.run();
         }
     }
@@ -275,8 +286,15 @@ public class WebSocketService {
         if (action == null) return;
         action.setDocumentId(this.docID);
         StompSession current = session;
-        if (current != null && current.isConnected()) {
-            current.send("/app/docs/" + docID + "/send-data", action);
+        if (!reconnecting && current != null && current.isConnected()) {
+            try {
+                current.send("/app/docs/" + docID + "/send-data", action);
+            } catch (Exception e) {
+                System.err.println("[WS] sendAction failed, queuing for retry: " + e.getMessage());
+                pendingActions.offer(action);
+                ensureScheduler();
+                scheduler.schedule(this::flushPendingActions, 2, TimeUnit.SECONDS);
+            }
         } else {
             pendingActions.offer(action);
         }
@@ -315,9 +333,20 @@ public class WebSocketService {
     private void flushPendingActions() {
         StompSession current = session;
         if (current == null || !current.isConnected()) return;
+        System.out.println("[WS] Flushing " + pendingActions.size() + " pending actions");
         Action next;
         while ((next = pendingActions.poll()) != null) {
-            current.send("/app/docs/" + docID + "/send-data", next);
+            System.out.println("[WS] Flushing " + next.getActionType() + " clock=" + next.getClock() + " parent=" + next.getStartCharID());
+            try {
+                current.send("/app/docs/" + docID + "/send-data", next);
+            } catch (Exception e) {
+                System.err.println("[WS] flushPendingActions send failed, re-queuing: " + e.getMessage());
+                pendingActions.offer(next);
+                // Schedule a retry so the remaining queue isn't silently abandoned.
+                ensureScheduler();
+                scheduler.schedule(this::flushPendingActions, 2, TimeUnit.SECONDS);
+                break;
+            }
         }
     }
 
@@ -367,7 +396,9 @@ public class WebSocketService {
             }
             System.out.println("[WS] Attempting reconnect #" + reconnectAttempts + "...");
 
-            // Re-register with the server session before opening WS
+            // Re-register with the server session BEFORE opening the STOMP connection.
+            // This ensures the server has the user in info.editors before flushPendingActions
+            // sends buffered local edits — otherwise canEdit=false and they are silently dropped.
             if (userId != null && joinCode != null) {
                 try {
                     String urlStr = "https://apt-project-production-326d.up.railway.app/join"
@@ -375,11 +406,15 @@ public class WebSocketService {
                     java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
                             new java.net.URL(urlStr).openConnection();
                     conn.setRequestMethod("GET");
-                    conn.getResponseCode();
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
+                    int status = conn.getResponseCode();
+                    String body = new String(conn.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                     conn.disconnect();
-                    System.out.println("[WS] Re-joined session for userId=" + userId);
+                    System.out.println("[WS] Re-joined session for userId=" + userId + " (HTTP " + status + ") response=" + body);
                 } catch (Exception e) {
                     System.err.println("[WS] Re-join failed: " + e.getMessage());
+                    // Proceed anyway — worst case the server will reject edits and we retry
                 }
             }
 
