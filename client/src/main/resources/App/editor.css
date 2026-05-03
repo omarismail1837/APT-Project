@@ -85,3 +85,28 @@
     -fx-fill: #d4d4d4;
 }
 
+.regular-highlighted {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-fill: #d4d4d4;
+    -rtfx-background-color: rgba(255, 235, 59, 0.35);
+}
+.bold-highlighted {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-weight: bold;
+    -fx-fill: #d4d4d4;
+    -rtfx-background-color: rgba(255, 235, 59, 0.35);
+}
+.italic-highlighted {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-style: italic;
+    -fx-fill: #d4d4d4;
+    -rtfx-background-color: rgba(255, 235, 59, 0.35);
+}
+.bold-italic-highlighted {
+    -fx-font-family: "Segoe UI", "System";
+    -fx-font-weight: bold;
+    -fx-font-style: italic;
+    -fx-fill: #d4d4d4;
+    -rtfx-background-color: rgba(255, 235, 59, 0.35);
+}
+

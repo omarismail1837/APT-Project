@@ -37,13 +37,24 @@ class SessionSyncController {
         );
 
         wsService.setOnDisconnected(() -> javafx.application.Platform.runLater(() -> {
-            if (host.connectedLabel != null) {
-                host.connectedLabel.setText("Disconnected");
-            }
+            if (host.connectedLabel != null) host.connectedLabel.setText("Disconnected");
         }));
 
+        wsService.setOnReconnecting(() -> javafx.application.Platform.runLater(() -> {
+            if (host.connectedLabel != null) host.connectedLabel.setText("Reconnecting...");
+        }));
+
+        wsService.setOnReconnected(() -> javafx.application.Platform.runLater(() -> {
+            // History has already been replayed and pending local edits flushed by
+            // WebSocketService before this callback fires. Just refresh the UI label.
+            if (host.connectedLabel != null) host.connectedLabel.setText("Connected");
+        }));
         host.setWsService(wsService);
         wsService.connect(BlankController.WS_URL);
+        String joinCode = host.canEdit()
+                ? host.getEditCode()
+                : host.getViewCode();
+        wsService.setReconnectCredentials(String.valueOf(host.getMySiteID()), joinCode);
     }
 
     void handleRemoteAction(Action action) {
@@ -79,6 +90,7 @@ class SessionSyncController {
             case "UPDATE":
             case "BOLD":
             case "ITALIC":
+            case "HIGHLIGHT":
             case "UNDELETE":
                 String actionId = host.buildActionId(action);
                 if (host.getSeenActionIds().contains(actionId)) return;

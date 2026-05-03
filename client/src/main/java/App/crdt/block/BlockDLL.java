@@ -479,6 +479,11 @@ public class BlockDLL implements ICRDT<BlockNode> {
                 setIsItalicRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
                 break;
 
+            case "HIGHLIGHT":
+                setIsHighlightedRange(startCharID, endCharID, Boolean.parseBoolean(extraData));
+                break;
+
+
             default:
                 break;
 
@@ -531,6 +536,29 @@ public class BlockDLL implements ICRDT<BlockNode> {
         }
 
     }
+
+    private void setIsHighlightedRange(String startCharID, String endCharID, boolean highlighted) {
+        String startBlockID = charBlockMap.get(startCharID);
+        String endBlockID = charBlockMap.get(endCharID);
+        if (startBlockID == null || endBlockID == null) return;
+
+        BlockNode startBlockNode = map.get(startBlockID);
+        BlockNode endBlockNode = map.get(endBlockID);
+        if (startBlockNode == null || endBlockNode == null) return;
+
+        BlockNode currentBlock = startBlockNode;
+
+        while (currentBlock != null) {
+            String startChar = currentBlock == startBlockNode ? startCharID : null;
+            String endChar = currentBlock == endBlockNode ? endCharID : null;
+
+            currentBlock.getContent().highlightRange(startChar, endChar, highlighted);
+
+            if (currentBlock == endBlockNode) break;
+            currentBlock = currentBlock.getNext();
+        }
+    }
+
 
     public List<Action> getAllActions() {
         ensureActionsListInitialized();

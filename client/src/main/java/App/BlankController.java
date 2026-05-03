@@ -51,6 +51,7 @@ public class BlankController implements Initializable {
     private final PresenceController presenceController;
     private final SessionSyncController sessionSyncController;
     private final VersionHistoryController versionHistoryController;
+    private final CommentController commentController;
 
     @FXML Label nameLabel;
     @FXML VBox activeUsersBox;
@@ -85,17 +86,22 @@ public class BlankController implements Initializable {
         this.presenceController = new PresenceController(this, documentController);
         this.sessionSyncController = new SessionSyncController(this, documentController, presenceController);
         this.versionHistoryController = new VersionHistoryController(this, documentController);
+        this.commentController = new CommentController(this);
     }
 
     public BlankController(BlockDLL blockDLL) {
         this("local-doc", "N/A", "N/A", null, 0, blockDLL, true, null, null);
     }
 
+    public CommentController getCommentController() { return commentController; }
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         documentController.initializeDocument();
         documentController.setupTextAreaListener();
-        if (canEdit) presenceController.setupCaretListener();
+        if (canEdit) {
+            presenceController.setupCaretListener();
+            commentController.rightClickListener();
+        }
         setupUI();
         setupKeybindings();
         sessionSyncController.setupWebSocket();
@@ -373,4 +379,6 @@ public class BlankController implements Initializable {
         docName = newName;
         if (nameLabel != null) nameLabel.setText(docName + ".txt");
     }
+    String getEditCode() { return editCode; }
+    String getViewCode() { return viewCode; }
 }

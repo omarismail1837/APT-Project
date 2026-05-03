@@ -37,6 +37,7 @@ class PresenceController {
     private long lastCursorBroadcastMs = 0;
     private final String username;
     private final String displayName;
+    private int lastDeletionStart = 0;
 
 
     PresenceController(BlankController host, EditorDocumentController documentController) {
@@ -147,6 +148,7 @@ class PresenceController {
             if (siteID == host.getMySiteID()) continue;
 
             int position = documentController.resolveTextAreaIndexForCharID(entry.getValue());
+            if (position == -1) position = lastDeletionStart;
             CaretNode caret = remoteCarets.computeIfAbsent(siteID, this::createRemoteCaret);
             int clamped = Math.max(0, Math.min(position, host.textArea.getLength()));
             TwoDimensional.Position areaPosition =
@@ -304,10 +306,13 @@ class PresenceController {
         return 0; // should never happen
     }
 
-    private boolean isColorAvailForSite(int color, int siteID)
-    {
+    private boolean isColorAvailForSite(int color, int siteID) {
         Integer owner = currentlyTakenColors.get(color);
         if (owner == null || owner == siteID) return true;
         return false;
+    }
+
+    void setLastDeletionStart(int idx) {
+        lastDeletionStart = idx;
     }
 }
