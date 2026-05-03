@@ -282,6 +282,7 @@ public class ChatController {
         if (userRepository.existsByUsername(user.getUsername())) {
             return "username_not_unique";
         }
+        user.setPassword(user.getPassword().hashCode() + ""); // simple hash for demonstration, not secure
         userRepository.save(user);
         return user.getUserId();
     }
@@ -290,7 +291,7 @@ public class ChatController {
     public String login(@RequestBody UserAccount login) {
         Optional<UserAccount> found = userRepository.findByUsername(login.getUsername());
         if (found.isEmpty()) return "does_not_exist";
-        if (!found.get().getPassword().equals(login.getPassword())) return "incorrect_password";
+        if (!found.get().getPassword().equals(login.getPassword().hashCode() + "")) return "incorrect_password";
         return found.get().getUserId();
     }
 
