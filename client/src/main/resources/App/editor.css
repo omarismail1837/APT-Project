@@ -85,3 +85,8 @@
     -fx-fill: #d4d4d4;
 }
 
+.highlighted {
+    -rtfx-background-color: #fef08a;
+}
+
+

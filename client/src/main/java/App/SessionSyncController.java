@@ -64,47 +64,48 @@ class SessionSyncController {
 
         String type = action.getActionType();
 
-        if ("PRESENCE".equals(type)){
-            presenceController.handleRemotePresence(action);
-            return;
-        }
-        if ("CURSOR".equals(type)) {
-            presenceController.handleRemoteCursor(action);
-            return;
-        }
-        if ("DISCONNECT".equals(type)) {
-            presenceController.handleRemoteDisconnect(action);
-            return;
-        }
-        if ("CURSOR_REMOVE".equals(type)) {
-            presenceController.handleCursorRemove(action);
-            return;
-        }
-        if ("RESTORE".equals(type)) {
-            host.handleRemoteRestore();
-            return;
-        }
-        if ("INSERT".equals(type)
-                || "DELETE".equals(type)
-                || "BOLD".equals(type)
-                || "ITALIC".equals(type)
-                || "UNDELETE".equals(type)){
+        switch(type) {
+            case "PRESENCE":
+                presenceController.handleRemotePresence(action);
+                break;
 
-            String actionId = host.buildActionId(action);
-            if (host.getSeenActionIds().contains(actionId)) return;
+            case "CURSOR":
+                presenceController.handleRemoteCursor(action);
+                break;
 
-            host.getSeenActionIds().add(actionId);
-            host.observeClock(action);
-            host.getBlockDLL().applyAction(action);
-            int caretSnapshot = host.textArea.getCaretPosition();
-            int anchorSnapshot = host.textArea.getAnchor();
-            documentController.rerender(caretSnapshot, anchorSnapshot);
-        }
-        if ("RENAME".equals(type)) {
-            host.handleRemoteRename(action.getExtraData());
-            return;
-        }
+            case "DISCONNECT":
+                presenceController.handleRemoteDisconnect(action);
+                break;
 
+            case "CURSOR_REMOVE":
+                presenceController.handleCursorRemove(action);
+                break;
+
+            case "RESTORE":
+                host.handleRemoteRestore();
+                break;
+
+            case "INSERT":
+            case "DELETE":
+            case "UPDATE":
+            case "BOLD":
+            case "ITALIC":
+            case "UNDELETE":
+                String actionId = host.buildActionId(action);
+                if (host.getSeenActionIds().contains(actionId)) return;
+
+                host.getSeenActionIds().add(actionId);
+                host.observeClock(action);
+                host.getBlockDLL().applyAction(action);
+                int caretSnapshot = host.textArea.getCaretPosition();
+                int anchorSnapshot = host.textArea.getAnchor();
+                documentController.rerender(caretSnapshot, anchorSnapshot);
+                break;
+
+            case "RENAME":
+                host.handleRemoteRename(action.getExtraData());
+                break;
+        }
     }
 
     void close() {

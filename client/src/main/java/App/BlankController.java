@@ -8,6 +8,10 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.VBox;
 import org.fxmisc.richtext.StyleClassedTextArea;
 import javafx.fxml.FXMLLoader;
@@ -47,6 +51,7 @@ public class BlankController implements Initializable {
     private final PresenceController presenceController;
     private final SessionSyncController sessionSyncController;
     private final VersionHistoryController versionHistoryController;
+    private final CommentController commentController;
 
     @FXML Label nameLabel;
     @FXML VBox activeUsersBox;
@@ -81,6 +86,7 @@ public class BlankController implements Initializable {
         this.presenceController = new PresenceController(this, documentController);
         this.sessionSyncController = new SessionSyncController(this, documentController, presenceController);
         this.versionHistoryController = new VersionHistoryController(this, documentController);
+        this.commentController = new CommentController(this);
     }
 
     public BlankController(BlockDLL blockDLL) {
@@ -93,7 +99,42 @@ public class BlankController implements Initializable {
         documentController.setupTextAreaListener();
         if (canEdit) presenceController.setupCaretListener();
         setupUI();
+        setupKeybindings();
+        commentController.rightClickListener();
         sessionSyncController.setupWebSocket();
+    }
+
+    private void setupKeybindings() {
+        if (textArea == null) return;
+
+        textArea.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            KeyCombination ctrlZ = new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN);
+            KeyCombination ctrlY = new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN);
+            KeyCombination ctrlB = new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN);
+            KeyCombination ctrlI = new KeyCodeCombination(KeyCode.I, KeyCombination.CONTROL_DOWN);
+            KeyCombination ctrlX = new KeyCodeCombination(KeyCode.X, KeyCombination.CONTROL_DOWN);
+
+            //remove editing capability if can't edit
+            if (!canEdit) {
+                return;
+            }
+
+            //handle each button press
+            if (ctrlZ.match(event)) {
+                undo();
+                event.consume();
+            } else if (ctrlY.match(event)) {
+                redo();
+                event.consume();
+            } else if (ctrlB.match(event)) {
+                toggleBold();
+                event.consume();
+            } else if (ctrlI.match(event)) {
+                toggleItalic();
+                event.consume();
+            }
+
+        });
     }
 
     private void setupUI() {
