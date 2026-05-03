@@ -106,6 +106,10 @@ class SessionSyncController {
             case "RENAME":
                 host.handleRemoteRename(action.getExtraData());
                 break;
+
+            case "COMMENT":
+                host.getCommentController().receiveRemoteComment(action);
+                break;
         }
     }
 

@@ -15,12 +15,21 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static io.micrometer.common.util.StringUtils.truncate;
 
 public class CommentController {
     private final BlankController host;
-    private final java.util.Map<String, String> comments = new LinkedHashMap<>();
+    private final Map<String, Comment> comments = new LinkedHashMap<>();
+    private static class Comment {
+        String username;
+        String text;
+        Comment(String username, String text) {
+            this.username = username;
+            this.text = text;
+        }
+    }
 
     CommentController(BlankController host) {
         this.host = host;
@@ -68,7 +77,7 @@ public class CommentController {
         dialog.setResizable(false);
 
         // preview of txt
-        Label preview = new Label("\"" + truncate(selectedText, 60) + "\"");
+        Label preview = new Label("\"" + truncateText(selectedText, 60) + "\"");
         preview.setStyle("-fx-font-style: italic; -fx-text-fill: #555; -fx-font-size: 12px;");
         preview.setWrapText(true);
 
@@ -97,11 +106,23 @@ public class CommentController {
             String text = commentInput.getText().trim();
             if (!text.isEmpty()) {
                 String key = start + "-" + end;
-                comments.put(key, text);
-                // highlight the annotated range
+                comments.put(key, new Comment(host.getPresenceController().getDisplayName(), text));                // highlight the annotated range
                 host.textArea.selectRange(start, end);
                 host.getDocumentController().highlight();
+                refreshCommentsSidebar();
             }
+
+            // broadcast comment
+            if (host.getWsService() != null) {
+                String startCharID = host.getDocumentController().getVisibleNode(start).getCharID();
+                String endCharID = host.getDocumentController().getVisibleNode(end - 1).getCharID();
+                App.crdt.action.Action action = new App.crdt.action.Action(
+                        host.nextClock(), host.now(), host.getMySiteID(), host.getDocID(),
+                        "COMMENT", startCharID, endCharID, text
+                );
+                host.getWsService().sendAction(action);
+            }
+
             dialog.close();
             // refresh sidebar here inshallah
         });
@@ -111,4 +132,47 @@ public class CommentController {
         dialog.setScene(new Scene(layout));
         dialog.showAndWait();
     }
+
+    void receiveRemoteComment(App.crdt.action.Action action) {
+        int start = host.getDocumentController().resolveTextAreaIndexForCharID(action.getStartCharID());
+        int end = host.getDocumentController().resolveTextAreaIndexForCharID(action.getEndCharID()) + 1;
+        if (start == -1 || end == -1) return;
+
+        if (action.getSiteID() == host.getMySiteID()) return; // ignore my comments
+
+        String commentText = action.getExtraData();
+        String senderName = host.getPresenceController().getNameForSite(action.getSiteID());
+        comments.put(start + "-" + end, new Comment(senderName, commentText));
+        host.textArea.selectRange(start, end);
+        host.getDocumentController().highlight();
+        refreshCommentsSidebar();
+    }
+
+    void refreshCommentsSidebar() {
+        if (host.commentsBox == null) return;
+        host.commentsBox.getChildren().clear();
+
+        for (Map.Entry<String, Comment> entry : comments.entrySet()) {
+            Comment comment = entry.getValue();
+
+            VBox card = new VBox(4);
+            card.setStyle("-fx-background-color: #2a2a2a; -fx-background-radius: 6; -fx-padding: 8;");
+
+            Label nameLabel = new Label(comment.username != null ? comment.username : "Anonymous");
+            nameLabel.setStyle("-fx-text-fill: #4ade80; -fx-font-size: 11; -fx-font-weight: bold;");
+
+            Label textLabel = new Label(comment.text);
+            textLabel.setStyle("-fx-text-fill: #e0e0e0; -fx-font-size: 12;");
+            textLabel.setWrapText(true);
+
+            card.getChildren().addAll(nameLabel, textLabel);
+            host.commentsBox.getChildren().add(card);
+        }
+    }
+
+    private String truncateText(String text, int maxLength) {
+        if (text == null || text.length() <= maxLength) return text;
+        return text.substring(0, maxLength - 3) + "...";
+    }
+
 }

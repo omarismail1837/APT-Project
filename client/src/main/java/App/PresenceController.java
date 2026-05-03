@@ -315,4 +315,11 @@ class PresenceController {
     void setLastDeletionStart(int idx) {
         lastDeletionStart = idx;
     }
+    String getNameForSite(int siteID) {
+        if (siteID == host.getMySiteID()) return displayName.replace(" (You)", "");
+        return remoteUserNames.getOrDefault(siteID, "Anonymous");
+    }
+    String getDisplayName() {
+        return displayName;
+    }
 }

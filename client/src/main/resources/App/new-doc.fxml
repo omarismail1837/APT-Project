@@ -75,11 +75,17 @@
                 <VBox prefWidth="220" spacing="15" style="-fx-padding: 20; -fx-border-color: transparent transparent transparent #333; -fx-border-width: 1; -fx-background-color: #1a1a1a;">
                     <Label text="ACTIVE USERS" style="-fx-text-fill: #666; -fx-font-size: 10; -fx-font-weight: bold; -fx-letter-spacing: 1;"/>
 
-                    <!-- Users growable area -->
-                    <VBox fx:id="activeUsersBox" spacing="12" VBox.vgrow="ALWAYS"/>
+                    <VBox fx:id="activeUsersBox" spacing="12"/>
 
-                    <!-- Spacer to push button to the bottom -->
-                    <Region VBox.vgrow="ALWAYS" />
+                    <Separator style="-fx-opacity: 0.2;"/>
+
+                    <Label text="COMMENTS" style="-fx-text-fill: #666; -fx-font-size: 10; -fx-font-weight: bold; -fx-letter-spacing: 1;"/>
+
+                    <ScrollPane VBox.vgrow="ALWAYS" fitToWidth="true" style="-fx-background-color: transparent; -fx-background: transparent;">
+                        <VBox fx:id="commentsBox" spacing="8" style="-fx-padding: 0 4 0 0;"/>
+                    </ScrollPane>
+
+                    <Region VBox.vgrow="ALWAYS"/>
 
                     <Button text="← Back to Dashboard"
                             onAction="#handleBack"
