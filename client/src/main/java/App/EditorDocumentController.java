@@ -267,8 +267,9 @@ class EditorDocumentController {
         if (visibleNodes.isEmpty()) return getSeedHeadID();
         if (caretPos <= 0) return getSeedHeadID();
 
-        int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
-        return visibleNodes.get(host.textArea.getAnchor()).getCharID();
+        int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1; // already has this
+        if (anchorIndex < 0 || anchorIndex >= visibleNodes.size()) return getSeedHeadID(); // add this
+        return visibleNodes.get(anchorIndex).getCharID();
     }
 
     void refreshUI() {

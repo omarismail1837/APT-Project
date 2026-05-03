@@ -90,6 +90,7 @@ class SessionSyncController {
             case "UPDATE":
             case "BOLD":
             case "ITALIC":
+            case "HIGHLIGHT":
             case "UNDELETE":
                 String actionId = host.buildActionId(action);
                 if (host.getSeenActionIds().contains(actionId)) return;
