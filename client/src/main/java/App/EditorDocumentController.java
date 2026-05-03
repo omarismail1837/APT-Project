@@ -11,13 +11,9 @@ import javafx.stage.Window;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.fxmisc.richtext.model.RichTextChange;
-import org.json.JSONObject;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -31,6 +27,7 @@ class EditorDocumentController {
     private final UndoRedoManager undoRedoManager = new UndoRedoManager();
     private final java.util.List<Action> pendingUndoBatch = new java.util.ArrayList<>();
     private final java.util.Map<String, String> redoRemapTable = new java.util.HashMap<>();
+    private boolean suppressUndoPush = false;
 
     EditorDocumentController(BlankController host) {
         this.host = host;
@@ -511,5 +508,96 @@ class EditorDocumentController {
     CharNode getVisibleNode(int index) {
         if (index < 0 || index >= visibleNodes.size()) return null;
         return visibleNodes.get(index);
+    }
+
+    void pasteWithFormatting(int replaceStart, int replaceEnd,
+                             String text, List<boolean[]> snapshot) {
+        suppressUndoPush = true;
+        pendingUndoBatch.clear();
+
+        try {
+            // 1. Insert text via textArea — listener fires, adds INSERT actions
+            //    to pendingUndoBatch but won't push (suppressed)
+            host.textArea.replaceText(replaceStart, replaceEnd, text);
+        } finally {
+            // runLater so the listener's own runLater (rerender) has settled first
+            javafx.application.Platform.runLater(() -> {
+                try {
+                    // 2. Apply formatting — adds BOLD/ITALIC actions to same batch
+                    if (snapshot != null && !snapshot.isEmpty()) {
+                        int insertEnd = replaceStart + text.length();
+                        applyFormattingSnapshot(replaceStart, insertEnd, snapshot);
+                        // applyFormattingSnapshot calls rerender, that's fine
+                    }
+                } finally {
+                    // 3. Push the entire batch as ONE undo entry
+                    suppressUndoPush = false;
+                    if (!pendingUndoBatch.isEmpty()) {
+                        undoRedoManager.pushUndo(new ArrayList<>(pendingUndoBatch));
+                        redoRemapTable.clear();
+                        pendingUndoBatch.clear();
+                    }
+                }
+            });
+        }
+    }
+
+
+    List<boolean[]> snapshotSelectionFormatting() {
+        IndexRange selection = host.textArea.getSelection();
+        if (selection.getLength() == 0) return null;
+
+        int start = selection.getStart();
+        int end = selection.getEnd(); // exclusive
+
+        List<boolean[]> snapshot = new ArrayList<>();
+        for (int i = start; i < end && i < visibleNodes.size(); i++) {
+            CharNode node = visibleNodes.get(i);
+            snapshot.add(new boolean[]{ node.getBold(), node.getItalic() });
+        }
+        return snapshot;
+    }
+
+
+    void applyFormattingSnapshot(int insertStart, int insertEnd, List<boolean[]> snapshot) {
+        if (snapshot == null || snapshot.isEmpty()) return;
+        if (insertStart < 0 || insertEnd > visibleNodes.size()) return;
+
+        int len = Math.min(insertEnd - insertStart, snapshot.size());
+
+        //send ranges to save action count
+        // apply bold in runs
+        applyFormattingRuns(insertStart, len, snapshot, 0, "BOLD");
+        // apply italic in runs
+        applyFormattingRuns(insertStart, len, snapshot, 1, "ITALIC");
+
+        int caret = host.textArea.getCaretPosition();
+        rerender(caret, caret);
+    }
+
+    private void applyFormattingRuns(int insertStart, int len,
+                                     List<boolean[]> snapshot,
+                                     int formatIndex, String actionType) {
+        int runStart = -1;
+        for (int i = 0; i <= len; i++) {
+            boolean active = i < len && snapshot.get(i)[formatIndex];
+            if (active && runStart == -1) {
+                runStart = i; // begin a run
+            } else if (!active && runStart != -1) {
+                // flush the run [runStart, i)
+                CharNode startNode = visibleNodes.get(insertStart + runStart);
+                CharNode endNode = visibleNodes.get(insertStart + i - 1);
+                Action action = new Action(
+                        host.nextClock(), host.now(), host.getMySiteID(), host.getDocID(),
+                        actionType,
+                        startNode.getCharID(),
+                        endNode.getCharID(),
+                        "true"
+                );
+                pendingUndoBatch.clear();
+                applyAndTrack(action);
+                runStart = -1;
+            }
+        }
     }
 }

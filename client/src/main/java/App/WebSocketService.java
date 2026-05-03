@@ -12,7 +12,6 @@ import org.springframework.web.socket.sockjs.client.WebSocketTransport;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -22,7 +21,7 @@ public class WebSocketService {
     private final Consumer<Action> onActionReceived;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Deque<Action> pendingActions = new ConcurrentLinkedDeque<>();
-    private final Queue<Action> bufferedLiveUpdates = new ConcurrentLinkedQueue<>();
+    private final BlockingQueue<Action> bufferedLiveUpdates = new LinkedBlockingQueue<>(5000);
     private final AtomicInteger replayState = new AtomicInteger(0);
     private final Runnable onConnected;
     private final ConcurrentHashMap<String, Action> localActionLog = new ConcurrentHashMap<>();
@@ -127,10 +126,26 @@ public class WebSocketService {
     }
 
     private void connectWithSockJs(String url) {
+        // 1. Create the standard client
+        StandardWebSocketClient rawClient = new StandardWebSocketClient();
+
+        // 2. Configure the internal container buffer (The "Low Level" Buffer)
+        // This prevents "Max message size exceeded" errors
+        rawClient.setUserProperties(Map.of(
+                "org.apache.tomcat.websocket.binaryBufferSize", 10 * 1024 * 1024, // 10MB
+                "org.apache.tomcat.websocket.textBufferSize", 10 * 1024 * 1024   // 10MB
+        ));
+
         SockJsClient sockJsClient = new SockJsClient(
-                List.of(new WebSocketTransport(new StandardWebSocketClient())));
+                List.of(new WebSocketTransport(rawClient)));
+
         WebSocketStompClient stompClient = new WebSocketStompClient(sockJsClient);
         stompClient.setMessageConverter(new MappingJackson2MessageConverter());
+
+        // 3. Configure STOMP level buffer (The "Message" Buffer)
+        // This controls the maximum size of a single STOMP frame.
+        stompClient.setInboundMessageSizeLimit(10 * 1024 * 1024); // 10MB
+
         org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler taskScheduler =
                 new org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler();
         taskScheduler.initialize();
@@ -201,7 +216,14 @@ public class WebSocketService {
                 Action action = convertToAction(payload);
                 if (action == null) return;
                 if (replayState.get() == 1) {
-                    bufferedLiveUpdates.offer(action);
+                    // use .offer() to check if full
+                    boolean accepted = bufferedLiveUpdates.offer(action);
+                    if (!accepted) {
+                        System.err.println("[WS] Buffer full! Dropping update or forcing Live mode.");
+                        // Strategy: If buffer is full, we must stop buffering and force live
+                        // to prevent data loss, even if history isn't perfect.
+                        switchToLiveMode();
+                    }
                 } else {
                     onActionReceived.accept(action);
                 }
