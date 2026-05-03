@@ -94,6 +94,7 @@ public class CommentController {
                 comments.put(key, new Comment(host.getPresenceController().getDisplayName(), text));                // highlight the annotated range
                 host.textArea.selectRange(start, end);
                 host.getDocumentController().highlight();
+                host.textArea.deselect();
                 refreshCommentsSidebar();
             }
 
@@ -109,7 +110,6 @@ public class CommentController {
             }
 
             dialog.close();
-            // refresh sidebar here inshallah
         });
 
         cancelBtn.setOnAction(ev -> dialog.close());
@@ -130,6 +130,7 @@ public class CommentController {
         comments.put(start + "-" + end, new Comment(senderName, commentText));
         host.textArea.selectRange(start, end);
         host.getDocumentController().highlight();
+        host.textArea.deselect();
         refreshCommentsSidebar();
     }
 
