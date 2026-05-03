@@ -84,6 +84,7 @@ class EditorDocumentController {
             }
             refreshMapping();
         }
+        host.getPresenceController().setLastDeletionStart(idx);
 
         if (!change.getInserted().getText().isEmpty()) {
             String seedID = getSeedHeadID();
@@ -259,7 +260,7 @@ class EditorDocumentController {
             }
         }
 
-        return host.textArea.getLength();
+        return -1; // character was deleted
     }
 
     String resolveCharIDForCaret(int caretPos) {
@@ -267,7 +268,7 @@ class EditorDocumentController {
         if (caretPos <= 0) return getSeedHeadID();
 
         int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
-        return visibleNodes.get(anchorIndex).getCharID();
+        return visibleNodes.get(host.textArea.getAnchor()).getCharID();
     }
 
     void refreshUI() {
