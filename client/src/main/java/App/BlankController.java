@@ -3,24 +3,22 @@ package App;
 import App.crdt.action.Action;
 import App.crdt.block.BlockDLL;
 import javafx.fxml.FXML;
-import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.layout.VBox;
-import org.fxmisc.richtext.StyleClassedTextArea;
 import javafx.fxml.FXMLLoader;
+import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.IndexRange;
+import javafx.scene.control.Label;
+import javafx.scene.input.*;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import org.fxmisc.richtext.StyleClassedTextArea;
+
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashSet;
+import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Set;
 
@@ -52,6 +50,8 @@ public class BlankController implements Initializable {
     private final SessionSyncController sessionSyncController;
     private final VersionHistoryController versionHistoryController;
     private final CommentController commentController;
+
+    private List<boolean[]> clipboardStyling = null; // each entry: [bold, italic] - stores formatting when copying to apply on paste
 
     @FXML Label nameLabel;
     @FXML VBox activeUsersBox;
@@ -116,6 +116,8 @@ public class BlankController implements Initializable {
             KeyCombination ctrlB = new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN);
             KeyCombination ctrlI = new KeyCodeCombination(KeyCode.I, KeyCombination.CONTROL_DOWN);
             KeyCombination ctrlX = new KeyCodeCombination(KeyCode.X, KeyCombination.CONTROL_DOWN);
+            KeyCombination ctrlV = new KeyCodeCombination(KeyCode.V, KeyCombination.CONTROL_DOWN);
+            KeyCombination ctrlC = new  KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN);
 
             //remove editing capability if can't edit
             if (!canEdit) {
@@ -135,13 +137,45 @@ public class BlankController implements Initializable {
             } else if (ctrlI.match(event)) {
                 toggleItalic();
                 event.consume();
+            } else if (ctrlV.match(event)) {
+                handlePaste();
+                event.consume();
+            } else if (ctrlC.match(event) || ctrlX.match(event)) {
+                clipboardStyling = documentController.snapshotSelectionFormatting();
+                //dont consume - text area handles the rest
             }
 
         });
     }
 
+    private void handlePaste() {
+        if (!canEdit) return;
+
+        Clipboard clipboard = Clipboard.getSystemClipboard();
+        if (!clipboard.hasString()) return;
+
+        String text = clipboard.getString();
+        if (text == null || text.isEmpty()) return;
+
+        List<boolean[]> formatSnapshot = clipboardStyling;
+        // clear after use so external pastes don't accidentally inherit it
+        clipboardStyling = null;
+
+        IndexRange selection = textArea.getSelection();
+        textArea.replaceText(selection.getStart(), selection.getEnd(), text);
+
+        if (formatSnapshot != null && !formatSnapshot.isEmpty()) {
+            final List<boolean[]> snapshot = formatSnapshot;
+            final int insertStart = selection.getStart();
+            final int insertEnd = insertStart + text.length();
+            javafx.application.Platform.runLater(() ->
+                    documentController.applyFormattingSnapshot(insertStart, insertEnd, snapshot)
+            );
+        }
+    }
+
     private void setupUI() {
-        if (nameLabel != null) nameLabel.setText(docName + ".txt");
+        if (nameLabel != null) nameLabel.setText(docName);
         if (docIdLabel != null) docIdLabel.setText(docID);
         if (textArea != null)
         {
@@ -377,7 +411,7 @@ public class BlankController implements Initializable {
     }
     public void handleRemoteRename(String newName) {
         docName = newName;
-        if (nameLabel != null) nameLabel.setText(docName + ".txt");
+        if (nameLabel != null) nameLabel.setText(docName);
     }
     String getEditCode() { return editCode; }
     String getViewCode() { return viewCode; }

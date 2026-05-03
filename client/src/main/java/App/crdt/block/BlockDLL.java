@@ -4,15 +4,10 @@ import App.crdt.action.Action;
 import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
 import App.crdt.character.ICRDT;
-import org.springframework.stereotype.Service;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 @Service
 public class BlockDLL implements ICRDT<BlockNode> {
@@ -22,7 +17,6 @@ public class BlockDLL implements ICRDT<BlockNode> {
     private List<Action> allActions;
     private Set<String> appliedActionIds;
     private final List<Action> pendingActions = new ArrayList<>();
-    private static final int MAX_PENDING_DRAIN_PASSES = 5;
 
     public BlockDLL() {
         head = new BlockNode();
@@ -413,8 +407,9 @@ public class BlockDLL implements ICRDT<BlockNode> {
 
     private void drainPendingActions() {
         if (pendingActions.isEmpty()) return;
-        for (int pass = 0; pass < MAX_PENDING_DRAIN_PASSES; pass++) {
-            boolean appliedAny = false;
+        boolean appliedAny;
+        do {
+            appliedAny = false;
             for (int i = 0; i < pendingActions.size(); i++) {
                 Action pending = pendingActions.get(i);
                 String pendingId = buildActionId(pending);
@@ -431,8 +426,7 @@ public class BlockDLL implements ICRDT<BlockNode> {
                 pendingActions.remove(i--);
                 appliedAny = true;
             }
-            if (!appliedAny) break;
-        }
+        } while (appliedAny && !pendingActions.isEmpty());
     }
 
     private void applyActionInternal(Action update) {
