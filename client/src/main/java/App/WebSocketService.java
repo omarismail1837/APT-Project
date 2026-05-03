@@ -32,7 +32,7 @@ public class WebSocketService {
     private final String docID;
 
     // Safety timer to prevent getting stuck in "Buffering" forever
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    private volatile ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     private static final long RECONNECT_WINDOW_MS = 5 * 60 * 1000L; // 5 minutes
     private static final long[] BACKOFF_DELAYS_MS = {2000, 5000, 10000, 20000, 30000}; // so all clients dont reconnect at same instant
@@ -42,10 +42,21 @@ public class WebSocketService {
     private volatile int reconnectAttempts = 0;
     private String lastUrl;
 
+    // Set when a reconnect has occurred; cleared once switchToLiveMode fires onReconnected.
+    private volatile boolean pendingReconnect = false;
+
 
     // Add a Runnable hook for UI feedback
     private Runnable onReconnecting;
     private Runnable onReconnected;
+
+    private String userId;
+    private String joinCode;
+
+    public void setReconnectCredentials(String userId, String joinCode) {
+        this.userId = userId;
+        this.joinCode = joinCode;
+    }
 
     public void setOnReconnecting(Runnable r) { this.onReconnecting = r; }
     public void setOnReconnected(Runnable r)  { this.onReconnected  = r; }
@@ -54,6 +65,13 @@ public class WebSocketService {
         this.docID = documentId;
         this.onActionReceived = onActionReceived;
         this.onConnected = onConnected;
+    }
+
+    // Ensure the scheduler exists
+    private synchronized void ensureScheduler() {
+        if (scheduler == null || scheduler.isShutdown() || scheduler.isTerminated()) {
+            scheduler = Executors.newScheduledThreadPool(2);
+        }
     }
 
     public void setOnDisconnected(Runnable onDisconnected) {
@@ -85,7 +103,11 @@ public class WebSocketService {
 
         // Stop the safety scheduler to avoid stray tasks running after disconnect.
         try {
-            scheduler.shutdownNow();
+            if (scheduler != null) {
+                scheduler.shutdownNow();
+                // allow re-creation on next connect
+                scheduler = null;
+            }
         } catch (Exception ignored) {}
 
         if (onDisconnected != null) {
@@ -98,32 +120,23 @@ public class WebSocketService {
     public void connect(String url) {
         this.lastUrl = url;
         this.intentionalDisconnect = false;
+        // Make sure the scheduler available
+        ensureScheduler();
         String sockJsUrl = normalizeHttpUrl(url);
         connectWithSockJs(sockJsUrl);
-        String nativeUrl = normalizeWebSocketUrl(url);
-        boolean nativeFirst = Boolean.parseBoolean(System.getProperty("ws.nativeFirst", "false"));
-
-        if (!nativeFirst) {
-            connectWithSockJs(sockJsUrl);
-            return;
-        }
-
-        AtomicBoolean fallbackStarted = new AtomicBoolean(false);
-        WebSocketStompClient nativeClient = new WebSocketStompClient(new StandardWebSocketClient());
-        nativeClient.setMessageConverter(new MappingJackson2MessageConverter());
-
-        CompletableFuture<StompSession> future = nativeClient.connectAsync(nativeUrl, buildSessionHandler("native"));
-        future.whenComplete((connectedSession, throwable) -> {
-            if (throwable != null && fallbackStarted.compareAndSet(false, true)) {
-                connectWithSockJs(sockJsUrl);
-            }
-        });
     }
 
     private void connectWithSockJs(String url) {
-        SockJsClient sockJsClient = new SockJsClient(List.of(new WebSocketTransport(new StandardWebSocketClient())));
+        SockJsClient sockJsClient = new SockJsClient(
+                List.of(new WebSocketTransport(new StandardWebSocketClient())));
         WebSocketStompClient stompClient = new WebSocketStompClient(sockJsClient);
         stompClient.setMessageConverter(new MappingJackson2MessageConverter());
+        org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler taskScheduler =
+                new org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler();
+        taskScheduler.initialize();
+        stompClient.setTaskScheduler(taskScheduler);
+        stompClient.setDefaultHeartbeat(new long[]{4000, 4000});
+
         stompClient.connectAsync(url, buildSessionHandler("sockjs"));
     }
 
@@ -136,18 +149,29 @@ public class WebSocketService {
                 reconnectAttempts = 0;
                 disconnectedAt = -1;
                 System.out.println("[WS] Connected via " + transportName);
-                subscribeToTopics();
-                flushPendingActions();   // for local edits
+
                 if (wasReconnect) {
-                    if (onReconnected != null) onReconnected.run();
-                } else {
-                    if (onConnected != null) onConnected.run();
+                    // On reconnect: mark the flag so switchToLiveMode fires onReconnected
+                    // after history has been replayed and pending local actions flushed.
+                    // We do NOT call handleRemoteRestore() here — seenActionIds naturally
+                    // deduplicates old history; only missed remote edits are applied.
+                    pendingReconnect = true;
+                }
+
+                // subscribeToTopics handles both the initial-state replay and live
+                // buffering for first-connect AND reconnect alike. Calling it once is
+                // sufficient; do NOT call resubscribeInitialState() on top of this.
+                subscribeToTopics();
+
+                if (!wasReconnect && onConnected != null) {
+                    onConnected.run();
                 }
             }
 
             @Override
             public void handleTransportError(StompSession s, Throwable ex) {
                 System.err.println("[WS] Transport error: " + ex.getMessage());
+                session = null;
                 if (!intentionalDisconnect) {
                     handleUnexpectedDisconnect();
                 }
@@ -237,6 +261,14 @@ public class WebSocketService {
         while ((queued = bufferedLiveUpdates.poll()) != null) {
             onActionReceived.accept(queued);
         }
+        // Send any local edits that were made while disconnected.
+        flushPendingActions();
+        // Only now — after remote edits are applied and local edits are sent —
+        // notify the UI that the reconnect is complete.
+        if (pendingReconnect) {
+            pendingReconnect = false;
+            if (onReconnected != null) onReconnected.run();
+        }
     }
 
     public void sendAction(Action action) {
@@ -305,6 +337,8 @@ public class WebSocketService {
         return url.replace("wss://", "https://").replace("ws://", "http://");
     }
     private void handleUnexpectedDisconnect() {
+        // ensure scheduler is available for scheduling reconnect attempts
+        ensureScheduler();
         if (disconnectedAt < 0) {
             disconnectedAt = System.currentTimeMillis();
         }
@@ -328,11 +362,27 @@ public class WebSocketService {
         scheduler.schedule(() -> {
             if (intentionalDisconnect) return;
             if (System.currentTimeMillis() - disconnectedAt > RECONNECT_WINDOW_MS) {
-                System.err.println("[WS] Reconnect window expired during backoff. Giving up.");
                 if (onDisconnected != null) onDisconnected.run();
                 return;
             }
             System.out.println("[WS] Attempting reconnect #" + reconnectAttempts + "...");
+
+            // Re-register with the server session before opening WS
+            if (userId != null && joinCode != null) {
+                try {
+                    String urlStr = "https://apt-project-production-326d.up.railway.app/join"
+                            + "?code=" + joinCode + "&userId=" + userId;
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                            new java.net.URL(urlStr).openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.getResponseCode();
+                    conn.disconnect();
+                    System.out.println("[WS] Re-joined session for userId=" + userId);
+                } catch (Exception e) {
+                    System.err.println("[WS] Re-join failed: " + e.getMessage());
+                }
+            }
+
             connectWithSockJs(normalizeHttpUrl(lastUrl));
         }, delayMs, TimeUnit.MILLISECONDS);
     }

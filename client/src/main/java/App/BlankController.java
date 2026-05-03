@@ -335,4 +335,6 @@ public class BlankController implements Initializable {
         docName = newName;
         if (nameLabel != null) nameLabel.setText(docName + ".txt");
     }
+    String getEditCode() { return editCode; }
+    String getViewCode() { return viewCode; }
 }
