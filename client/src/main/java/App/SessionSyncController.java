@@ -50,6 +50,13 @@ class SessionSyncController {
             if (host.connectedLabel != null) host.connectedLabel.setText("Connected");
         }));
         host.setWsService(wsService);
+        wsService.setOnBeforeReconnectReplay(() ->
+                javafx.application.Platform.runLater(() -> {
+                    host.getBlockDLL().clear();
+                    host.getSeenActionIds().clear();
+                    documentController.initializeDocument();
+                })
+        );
         wsService.connect(BlankController.WS_URL);
         String joinCode = host.canEdit()
                 ? host.getEditCode()
