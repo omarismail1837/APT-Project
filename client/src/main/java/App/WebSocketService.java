@@ -10,9 +10,7 @@ import org.springframework.web.socket.sockjs.client.SockJsClient;
 import org.springframework.web.socket.sockjs.client.WebSocketTransport;
 
 import java.lang.reflect.Type;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,10 +21,11 @@ public class WebSocketService {
     private volatile StompSession session;
     private final Consumer<Action> onActionReceived;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Queue<Action> pendingActions = new ConcurrentLinkedQueue<>();
+    private final Deque<Action> pendingActions = new ConcurrentLinkedDeque<>();
     private final Queue<Action> bufferedLiveUpdates = new ConcurrentLinkedQueue<>();
     private final AtomicInteger replayState = new AtomicInteger(0);
     private final Runnable onConnected;
+    private final ConcurrentHashMap<String, Action> localActionLog = new ConcurrentHashMap<>();
     // optional hook invoked when the client intentionally disconnects or is disconnected
     private Runnable onDisconnected;
     private final String docID;
@@ -152,16 +151,11 @@ public class WebSocketService {
                 System.out.println("[WS] Connected via " + transportName);
 
                 if (wasReconnect) {
-                    // On reconnect: mark the flag so switchToLiveMode fires onReconnected
-                    // after history has been replayed and pending local actions flushed.
-                    // We do NOT call handleRemoteRestore() here — seenActionIds naturally
-                    // deduplicates old history; only missed remote edits are applied.
                     pendingReconnect = true;
                 }
 
                 // subscribeToTopics handles both the initial-state replay and live
-                // buffering for first-connect AND reconnect alike. Calling it once is
-                // sufficient; do NOT call resubscribeInitialState() on top of this.
+                // buffering for first-connect AND reconnect alike. Calling it once is sufficient do NOT call resubscribeInitialState() on top of this.
                 subscribeToTopics();
 
                 if (!wasReconnect && onConnected != null) {
@@ -190,7 +184,6 @@ public class WebSocketService {
         replayState.set(1);
         bufferedLiveUpdates.clear();
 
-        // SAFETY VALVE: If history isn't received in 5s, force live mode anyway
         scheduler.schedule(() -> {
             if (replayState.get() == 1) {
                 System.err.println("[WS] History timeout! Forcing Live Mode.");
@@ -202,11 +195,11 @@ public class WebSocketService {
         session.subscribe("/topic/docs/" + docID + "/updates", new StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) { return Action.class; }
+
             @Override
             public void handleFrame(StompHeaders headers, Object payload) {
                 Action action = convertToAction(payload);
                 if (action == null) return;
-
                 if (replayState.get() == 1) {
                     bufferedLiveUpdates.offer(action);
                 } else {
@@ -215,29 +208,24 @@ public class WebSocketService {
             }
         });
 
-        // 2. Initial State (History)
+        // 2. History
         session.subscribe("/app/docs/" + docID + "/initial-state", new StompFrameHandler() {
             @Override
-            public Type getPayloadType(StompHeaders headers) {
-                // We accept Object.class because we will handle the byte[] or List manually
-                return Object.class;
-            }
+            public Type getPayloadType(StompHeaders headers) { return Object.class; }
 
             @Override
             public void handleFrame(StompHeaders headers, Object payload) {
-                System.out.println("[WS] Received history data of type: " + payload.getClass().getSimpleName());
-
+                System.out.println("[WS] Received history data of type: "
+                        + payload.getClass().getSimpleName());
                 try {
                     List<Action> actions = null;
 
-                    // HANDLE BYTE ARRAY (The "class [B" you are seeing)
                     if (payload instanceof byte[] bytes) {
                         System.out.println("[WS] Decoding raw bytes to List<Action>...");
                         actions = objectMapper.readValue(bytes,
-                                objectMapper.getTypeFactory().constructCollectionType(List.class, Action.class));
-                    }
-                    // HANDLE ALREADY CONVERTED LIST
-                    else if (payload instanceof List<?> payloadList) {
+                                objectMapper.getTypeFactory()
+                                        .constructCollectionType(List.class, Action.class));
+                    } else if (payload instanceof List<?> payloadList) {
                         actions = payloadList.stream()
                                 .map(item -> convertToAction(item))
                                 .toList();
@@ -248,13 +236,56 @@ public class WebSocketService {
                         for (Action a : actions) {
                             onActionReceived.accept(a);
                         }
+
+                        // Reconciliation: find actions this client sent that the server never persisted.
+                        if (!localActionLog.isEmpty()) {
+                            Set<String> confirmed = new HashSet<>();
+                            for (Action a : actions) {
+                                confirmed.add(a.getSiteID() + "-" + a.getClock());
+                            }
+
+                            // Also exclude anything already sitting in pendingActions —
+                            // those are offline-typed and haven't been sent yet, so they
+                            // are correctly absent from history. Don't double-queue them.
+                            Set<String> alreadyQueued = new HashSet<>();
+                            for (Action a : pendingActions) {
+                                alreadyQueued.add(a.getSiteID() + "-" + a.getClock());
+                            }
+
+                            List<Action> missing = localActionLog.entrySet().stream()
+                                    .filter(e -> !confirmed.contains(e.getKey()))
+                                    .filter(e -> !alreadyQueued.contains(e.getKey()))
+                                    .map(Map.Entry::getValue)
+                                    .sorted(Comparator.comparingLong(Action::getClock))
+                                    .collect(java.util.stream.Collectors.toList());
+
+                            if (!missing.isEmpty()) {
+                                System.out.println("[WS] Reconciliation: " + missing.size()
+                                        + " send-but-lost actions re-queued.");
+                                for (int i = missing.size() - 1; i >= 0; i--) {
+                                    pendingActions.addFirst(missing.get(i));
+                                }
+                            } else {
+                                System.out.println("[WS] Reconciliation: no lost actions.");
+                            }
+                            localActionLog.clear();
+                        }
                     }
 
                 } catch (Exception e) {
-                    System.err.println("[WS] Failed to decode history bytes: " + e.getMessage());
+                    System.err.println("[WS] Failed to decode history: " + e.getMessage());
                     e.printStackTrace();
                 } finally {
+                    // Switch to live mode. If the safety timeout already fired and set
+                    // replayState=2, switchToLiveMode() returns early and the newly
+                    // prepended items never get flushed. Call flushPendingActions()
+                    // directly here to cover that race.
+                    boolean alreadyLive = replayState.get() == 2;
                     switchToLiveMode();
+                    if (alreadyLive) {
+                        System.out.println("[WS] History arrived after safety timeout — flushing directly.");
+                        flushPendingActions();
+                    }
                 }
             }
         });
@@ -285,12 +316,22 @@ public class WebSocketService {
     public void sendAction(Action action) {
         if (action == null) return;
         action.setDocumentId(this.docID);
+
+        // Log every local action so we can detect server-side loss on reconnect.
+        // Skip ephemeral actions that aren't persisted on the server anyway.
+        String type = action.getActionType();
+        if (!type.equals("CURSOR") && !type.equals("CURSOR_REMOVE")
+                && !type.equals("PRESENCE") && !type.equals("DISCONNECT")) {
+            String key = action.getSiteID() + "-" + action.getClock();
+            localActionLog.put(key, action);
+        }
+
         StompSession current = session;
         if (!reconnecting && current != null && current.isConnected()) {
             try {
                 current.send("/app/docs/" + docID + "/send-data", action);
             } catch (Exception e) {
-                System.err.println("[WS] sendAction failed, queuing for retry: " + e.getMessage());
+                System.err.println("[WS] sendAction failed, queuing: " + e.getMessage());
                 pendingActions.offer(action);
                 ensureScheduler();
                 scheduler.schedule(this::flushPendingActions, 2, TimeUnit.SECONDS);
