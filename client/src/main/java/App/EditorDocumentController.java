@@ -161,7 +161,8 @@ class EditorDocumentController {
         int docLength = host.textArea.getLength();
         for (int i = 0; i < visibleNodes.size() && i < docLength; i++) {
             CharNode node = visibleNodes.get(i);
-            host.textArea.setStyleClass(i, i + 1, resolveBaseClass(node));
+            String styleClass = resolveBaseClass(node);
+            host.textArea.setStyleClass(i, i + 1, styleClass);
         }
     }
 
@@ -171,6 +172,10 @@ class EditorDocumentController {
 
     void toggleItalic() {
         applyFormattingAction("ITALIC", CharNode::getItalic);
+    }
+
+    void highlight() {
+        applyFormattingAction("HIGHLIGHT", CharNode::getHighlighted);
     }
 
     void exportDocument() {
@@ -343,10 +348,13 @@ class EditorDocumentController {
     }
 
     private String resolveBaseClass(CharNode node) {
-        if (node.getBold() && node.getItalic()) return "bold-italic";
-        if (node.getBold()) return "bold";
-        if (node.getItalic()) return "italic";
-        return "regular";
+        String base;
+        if (node.getBold() && node.getItalic()) base = "bold-italic";
+        else if (node.getBold()) base = "bold";
+        else if (node.getItalic()) base = "italic";
+        else base = "regular";
+
+        return node.getHighlighted() ? base + "-highlighted" : base;
     }
 
     private void ensureSeedBlock() {
@@ -527,5 +535,11 @@ class EditorDocumentController {
     private String appliedCharID(Action action) {
         if (action == null) return null;
         return action.getSiteID() + "-" + action.getClock();
+    }
+
+    // for commentcontroller
+    CharNode getVisibleNode(int index) {
+        if (index < 0 || index >= visibleNodes.size()) return null;
+        return visibleNodes.get(index);
     }
 }

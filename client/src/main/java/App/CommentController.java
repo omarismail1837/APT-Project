@@ -101,7 +101,15 @@ public class CommentController {
                 String key = start + "-" + end;
                 comments.put(key, text);
                 // highlight the annotated range
-                host.textArea.setStyleClass(start, end, "highlighted");
+                for (int i = start; i < end; i++) {
+                    System.out.println("highlighting index " + i);
+                    CharNode node = host.getDocumentController().getVisibleNode(i);
+                    if (node != null) {
+                        System.out.println("the node is null!");
+                        node.setHighlighted(true);
+                    }
+                }
+                host.getDocumentController().rerender(host.textArea.getCaretPosition(), host.textArea.getAnchor());
             }
             dialog.close();
             // refresh sidebar here inshallah

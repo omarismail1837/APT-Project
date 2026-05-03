@@ -16,6 +16,7 @@ public class CharNode {
     private int depth;
     private boolean isDeleted;
     private boolean isBold;
+    private boolean isHighlighted; // for comments
     private boolean isItalic;
     @JsonIgnore //prevents infinite loop when sending data
     private CharNode next;
@@ -32,7 +33,8 @@ public class CharNode {
             @JsonProperty("parentID") String parentID,
             @JsonProperty("isBold") boolean isBold,
             @JsonProperty("isItalic") boolean isItalic,
-            @JsonProperty("isDeleted") boolean isDeleted
+            @JsonProperty("isDeleted") boolean isDeleted,
+            @JsonProperty("isHighlighted") boolean isHighlighted
     )    {
         this.clock = clock;
         this.siteID = siteID;
@@ -43,9 +45,10 @@ public class CharNode {
         this.isBold = isBold;
         this.isItalic = isItalic;
         this.isDeleted = isDeleted;
+        this.isHighlighted = isHighlighted;
     }
 
-    public CharNode(int siteID, long clock, long time, char content, String parentID, boolean isBold, boolean isItalic) {
+    public CharNode(int siteID, long clock, long time, char content, String parentID, boolean isBold, boolean isItalic, boolean isHighlighted) {
         this.clock = clock;
         this.siteID = siteID;
         this.charID = siteID + "-" + clock;
@@ -55,6 +58,7 @@ public class CharNode {
         this.isBold = isBold;
         this.isItalic = isItalic;
         this.isDeleted = false;
+        this.isHighlighted = isHighlighted;
     }
 
     // Constructor without bold & italic
@@ -79,6 +83,7 @@ public class CharNode {
     public int getDepth() { return this.depth; }
     public boolean getBold() {return this.isBold; }
     public boolean getItalic() {return this.isItalic; }
+    public boolean getHighlighted() {return this.isHighlighted; }
     public CharNode getPrev() { return this.prev; }
 
 
@@ -92,6 +97,7 @@ public class CharNode {
     public void undelete() { this.isDeleted = false; }
     public void setBold(boolean bold) { this.isBold = bold; }
     public void setItalic(boolean italic) { this.isItalic = italic; }
+    public void setHighlighted(boolean highlighted) {this.isHighlighted = highlighted;}
     public void setDepth(int depth) { this.depth = depth; }
     public void setParentID(String parentID) { this.parentID = parentID; }
 
