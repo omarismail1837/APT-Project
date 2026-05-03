@@ -32,7 +32,23 @@ public class WebSocketService {
     private final String docID;
 
     // Safety timer to prevent getting stuck in "Buffering" forever
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+
+    private static final long RECONNECT_WINDOW_MS = 5 * 60 * 1000L; // 5 minutes
+    private static final long[] BACKOFF_DELAYS_MS = {2000, 5000, 10000, 20000, 30000}; // so all clients dont reconnect at same instant
+
+    private volatile boolean intentionalDisconnect = false;
+    private volatile long disconnectedAt = -1;
+    private volatile int reconnectAttempts = 0;
+    private String lastUrl;
+
+
+    // Add a Runnable hook for UI feedback
+    private Runnable onReconnecting;
+    private Runnable onReconnected;
+
+    public void setOnReconnecting(Runnable r) { this.onReconnecting = r; }
+    public void setOnReconnected(Runnable r)  { this.onReconnected  = r; }
 
     public WebSocketService(String documentId, Consumer<Action> onActionReceived, Runnable onConnected) {
         this.docID = documentId;
@@ -51,6 +67,7 @@ public class WebSocketService {
     }
 
     public void disconnect() {
+        intentionalDisconnect = true;
         StompSession s = session;
         if (s != null) {
             try {
@@ -79,8 +96,11 @@ public class WebSocketService {
     }
 
     public void connect(String url) {
-        String nativeUrl = normalizeWebSocketUrl(url);
+        this.lastUrl = url;
+        this.intentionalDisconnect = false;
         String sockJsUrl = normalizeHttpUrl(url);
+        connectWithSockJs(sockJsUrl);
+        String nativeUrl = normalizeWebSocketUrl(url);
         boolean nativeFirst = Boolean.parseBoolean(System.getProperty("ws.nativeFirst", "false"));
 
         if (!nativeFirst) {
@@ -112,14 +132,25 @@ public class WebSocketService {
             @Override
             public void afterConnected(StompSession s, StompHeaders headers) {
                 session = s;
+                boolean wasReconnect = reconnectAttempts > 0;
+                reconnectAttempts = 0;
+                disconnectedAt = -1;
                 System.out.println("[WS] Connected via " + transportName);
                 subscribeToTopics();
-                flushPendingActions();
-                if (onConnected != null) onConnected.run();
+                flushPendingActions();   // for local edits
+                if (wasReconnect) {
+                    if (onReconnected != null) onReconnected.run();
+                } else {
+                    if (onConnected != null) onConnected.run();
+                }
             }
+
             @Override
             public void handleTransportError(StompSession s, Throwable ex) {
                 System.err.println("[WS] Transport error: " + ex.getMessage());
+                if (!intentionalDisconnect) {
+                    handleUnexpectedDisconnect();
+                }
             }
         };
     }
@@ -272,5 +303,37 @@ public class WebSocketService {
     private String normalizeHttpUrl(String url) {
         if (url == null || url.isBlank()) return "http://localhost:8080/ws-connect";
         return url.replace("wss://", "https://").replace("ws://", "http://");
+    }
+    private void handleUnexpectedDisconnect() {
+        if (disconnectedAt < 0) {
+            disconnectedAt = System.currentTimeMillis();
+        }
+
+        long elapsed = System.currentTimeMillis() - disconnectedAt;
+        if (elapsed > RECONNECT_WINDOW_MS) {
+            System.err.println("[WS] Reconnect window expired (5 min). Giving up.");
+            session = null;
+            if (onDisconnected != null) onDisconnected.run();
+            return;
+        }
+        //pick delay
+        long delayMs = BACKOFF_DELAYS_MS[Math.min(reconnectAttempts, BACKOFF_DELAYS_MS.length - 1)];
+        reconnectAttempts++;
+
+        System.out.printf("[WS] Scheduling reconnect attempt #%d in %ds%n",
+                reconnectAttempts, delayMs / 1000);
+
+        if (onReconnecting != null) onReconnecting.run();
+
+        scheduler.schedule(() -> {
+            if (intentionalDisconnect) return;
+            if (System.currentTimeMillis() - disconnectedAt > RECONNECT_WINDOW_MS) {
+                System.err.println("[WS] Reconnect window expired during backoff. Giving up.");
+                if (onDisconnected != null) onDisconnected.run();
+                return;
+            }
+            System.out.println("[WS] Attempting reconnect #" + reconnectAttempts + "...");
+            connectWithSockJs(normalizeHttpUrl(lastUrl));
+        }, delayMs, TimeUnit.MILLISECONDS);
     }
 }

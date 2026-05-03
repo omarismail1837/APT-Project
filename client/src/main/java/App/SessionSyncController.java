@@ -37,11 +37,17 @@ class SessionSyncController {
         );
 
         wsService.setOnDisconnected(() -> javafx.application.Platform.runLater(() -> {
-            if (host.connectedLabel != null) {
-                host.connectedLabel.setText("Disconnected");
-            }
+            if (host.connectedLabel != null) host.connectedLabel.setText("Disconnected");
         }));
 
+        wsService.setOnReconnecting(() -> javafx.application.Platform.runLater(() -> {
+            if (host.connectedLabel != null) host.connectedLabel.setText("Reconnecting...");
+        }));
+
+        wsService.setOnReconnected(() -> javafx.application.Platform.runLater(() -> {
+            if (host.connectedLabel != null) host.connectedLabel.setText("Reconnected");
+            host.handleRemoteRestore();
+        }));
         host.setWsService(wsService);
         wsService.connect(BlankController.WS_URL);
     }
