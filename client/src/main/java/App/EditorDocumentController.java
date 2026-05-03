@@ -516,18 +516,14 @@ class EditorDocumentController {
         pendingUndoBatch.clear();
 
         try {
-            // 1. Insert text via textArea — listener fires, adds INSERT actions
-            //    to pendingUndoBatch but won't push (suppressed)
             host.textArea.replaceText(replaceStart, replaceEnd, text);
         } finally {
-            // runLater so the listener's own runLater (rerender) has settled first
             javafx.application.Platform.runLater(() -> {
                 try {
                     // 2. Apply formatting — adds BOLD/ITALIC actions to same batch
                     if (snapshot != null && !snapshot.isEmpty()) {
                         int insertEnd = replaceStart + text.length();
-                        applyFormattingSnapshot(replaceStart, insertEnd, snapshot);
-                        // applyFormattingSnapshot calls rerender, that's fine
+                        applyFormattingSnapshot(replaceStart, insertEnd, snapshot, false);
                     }
                 } finally {
                     // 3. Push the entire batch as ONE undo entry
@@ -537,6 +533,8 @@ class EditorDocumentController {
                         redoRemapTable.clear();
                         pendingUndoBatch.clear();
                     }
+                    int caret = host.textArea.getCaretPosition();
+                    rerender(caret, caret); // single rerender at the very end
                 }
             });
         }
@@ -559,20 +557,19 @@ class EditorDocumentController {
     }
 
 
-    void applyFormattingSnapshot(int insertStart, int insertEnd, List<boolean[]> snapshot) {
+    void applyFormattingSnapshot(int insertStart, int insertEnd,
+                                 List<boolean[]> snapshot, boolean doRerender) {
         if (snapshot == null || snapshot.isEmpty()) return;
         if (insertStart < 0 || insertEnd > visibleNodes.size()) return;
 
         int len = Math.min(insertEnd - insertStart, snapshot.size());
-
-        //send ranges to save action count
-        // apply bold in runs
         applyFormattingRuns(insertStart, len, snapshot, 0, "BOLD");
-        // apply italic in runs
         applyFormattingRuns(insertStart, len, snapshot, 1, "ITALIC");
 
-        int caret = host.textArea.getCaretPosition();
-        rerender(caret, caret);
+        if (doRerender) {
+            int caret = host.textArea.getCaretPosition();
+            rerender(caret, caret);
+        }
     }
 
     private void applyFormattingRuns(int insertStart, int len,
@@ -582,11 +579,10 @@ class EditorDocumentController {
         for (int i = 0; i <= len; i++) {
             boolean active = i < len && snapshot.get(i)[formatIndex];
             if (active && runStart == -1) {
-                runStart = i; // begin a run
+                runStart = i;
             } else if (!active && runStart != -1) {
-                // flush the run [runStart, i)
                 CharNode startNode = visibleNodes.get(insertStart + runStart);
-                CharNode endNode = visibleNodes.get(insertStart + i - 1);
+                CharNode endNode   = visibleNodes.get(insertStart + i - 1);
                 Action action = new Action(
                         host.nextClock(), host.now(), host.getMySiteID(), host.getDocID(),
                         actionType,
@@ -594,8 +590,7 @@ class EditorDocumentController {
                         endNode.getCharID(),
                         "true"
                 );
-                pendingUndoBatch.clear();
-                applyAndTrack(action);
+                applyAndTrack(action); // just accumulates into pendingUndoBatch
                 runStart = -1;
             }
         }
