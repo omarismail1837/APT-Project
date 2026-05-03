@@ -12,7 +12,6 @@ import org.springframework.web.socket.sockjs.client.WebSocketTransport;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -30,6 +29,11 @@ public class WebSocketService {
     private Runnable onDisconnected;
     private final String docID;
 
+    // Persist pending actions so offline edits survive app restarts.
+    private final java.nio.file.Path pendingStorageDir =
+            java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "apt_pending_actions");
+    private final java.nio.file.Path pendingStorageFile;
+
     // Safety timer to prevent getting stuck in "Buffering" forever
     private volatile ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -39,12 +43,12 @@ public class WebSocketService {
     private volatile boolean intentionalDisconnect = false;
     private volatile boolean reconnecting = false; // true from transport drop until live mode restored
     private volatile long disconnectedAt = -1;
-    private volatile int reconnectAttempts = 0;
+    private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private String lastUrl;
 
     // Set when a reconnect has occurred; cleared once switchToLiveMode fires onReconnected.
     private volatile boolean pendingReconnect = false;
-
+    private volatile boolean historyApplied = false;
 
     // Add a Runnable hook for UI feedback
     private Runnable onReconnecting;
@@ -65,6 +69,13 @@ public class WebSocketService {
         this.docID = documentId;
         this.onActionReceived = onActionReceived;
         this.onConnected = onConnected;
+        this.pendingStorageFile = pendingStorageDir.resolve(documentId + "-pending.json");
+
+        try {
+            loadPendingActionsFromDisk();
+        } catch (Exception e) {
+            System.err.println("[WS] Failed to load persisted pending actions: " + e.getMessage());
+        }
     }
 
     // Ensure the scheduler exists
@@ -145,8 +156,7 @@ public class WebSocketService {
             @Override
             public void afterConnected(StompSession s, StompHeaders headers) {
                 session = s;
-                boolean wasReconnect = reconnectAttempts > 0;
-                reconnectAttempts = 0;
+                boolean wasReconnect = reconnectAttempts.getAndSet(0) > 0;
                 disconnectedAt = -1;
                 System.out.println("[WS] Connected via " + transportName);
 
@@ -182,11 +192,13 @@ public class WebSocketService {
     private void subscribeToTopics() {
         if (session == null) return;
         replayState.set(1);
+        historyApplied = false;
         bufferedLiveUpdates.clear();
 
         scheduler.schedule(() -> {
             if (replayState.get() == 1) {
                 System.err.println("[WS] History timeout! Forcing Live Mode.");
+                historyApplied = true;
                 switchToLiveMode();
             }
         }, 5, TimeUnit.SECONDS);
@@ -276,16 +288,8 @@ public class WebSocketService {
                     System.err.println("[WS] Failed to decode history: " + e.getMessage());
                     e.printStackTrace();
                 } finally {
-                    // Switch to live mode. If the safety timeout already fired and set
-                    // replayState=2, switchToLiveMode() returns early and the newly
-                    // prepended items never get flushed. Call flushPendingActions()
-                    // directly here to cover that race.
-                    boolean alreadyLive = replayState.get() == 2;
+                    historyApplied = true;
                     switchToLiveMode();
-                    if (alreadyLive) {
-                        System.out.println("[WS] History arrived after safety timeout — flushing directly.");
-                        flushPendingActions();
-                    }
                 }
             }
         });
@@ -299,8 +303,10 @@ public class WebSocketService {
         while ((queued = bufferedLiveUpdates.poll()) != null) {
             onActionReceived.accept(queued);
         }
-        // Send any local edits that were made while disconnected.
-        flushPendingActions();
+        if (historyApplied) {
+            // Send any local edits that were made while disconnected.
+            flushPendingActions();
+        }
         // Only now — after remote edits are applied and local edits are sent —
         // notify the UI that the reconnect is complete and re-broadcast presence.
         reconnecting = false; // live mode restored — direct sends are safe again
@@ -333,11 +339,21 @@ public class WebSocketService {
             } catch (Exception e) {
                 System.err.println("[WS] sendAction failed, queuing: " + e.getMessage());
                 pendingActions.offer(action);
+                try {
+                    persistPendingActionsToDisk();
+                } catch (Exception ex) {
+                    System.err.println("[WS] Failed to persist pending actions: " + ex.getMessage());
+                }
                 ensureScheduler();
                 scheduler.schedule(this::flushPendingActions, 2, TimeUnit.SECONDS);
             }
         } else {
             pendingActions.offer(action);
+            try {
+                persistPendingActionsToDisk();
+            } catch (Exception e) {
+                System.err.println("[WS] Failed to persist pending actions: " + e.getMessage());
+            }
         }
     }
 
@@ -376,6 +392,7 @@ public class WebSocketService {
         if (current == null || !current.isConnected()) return;
         System.out.println("[WS] Flushing " + pendingActions.size() + " pending actions");
         Action next;
+        boolean drained = true;
         while ((next = pendingActions.poll()) != null) {
             System.out.println("[WS] Flushing " + next.getActionType() + " clock=" + next.getClock() + " parent=" + next.getStartCharID());
             try {
@@ -383,11 +400,55 @@ public class WebSocketService {
             } catch (Exception e) {
                 System.err.println("[WS] flushPendingActions send failed, re-queuing: " + e.getMessage());
                 pendingActions.offer(next);
+                drained = false;
                 // Schedule a retry so the remaining queue isn't silently abandoned.
                 ensureScheduler();
                 scheduler.schedule(this::flushPendingActions, 2, TimeUnit.SECONDS);
                 break;
             }
+        }
+        if (drained && pendingActions.isEmpty()) {
+            try {
+                clearPendingActionsFile();
+            } catch (Exception e) {
+                System.err.println("[WS] Failed to clear persisted pending actions: " + e.getMessage());
+            }
+        }
+    }
+
+    private synchronized void persistPendingActionsToDisk() throws java.io.IOException {
+        try {
+            if (!java.nio.file.Files.exists(pendingStorageDir)) {
+                java.nio.file.Files.createDirectories(pendingStorageDir);
+            }
+            List<Action> snapshot = new ArrayList<>(pendingActions);
+            objectMapper.writeValue(pendingStorageFile.toFile(), snapshot);
+        } catch (Exception e) {
+            throw new java.io.IOException(e);
+        }
+    }
+
+    private synchronized void loadPendingActionsFromDisk() throws java.io.IOException {
+        try {
+            if (pendingStorageFile != null && java.nio.file.Files.exists(pendingStorageFile)) {
+                List<Action> persisted = objectMapper.readValue(pendingStorageFile.toFile(),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, Action.class));
+                if (persisted != null) {
+                    for (Action a : persisted) pendingActions.offer(a);
+                }
+            }
+        } catch (Exception e) {
+            throw new java.io.IOException(e);
+        }
+    }
+
+    private synchronized void clearPendingActionsFile() throws java.io.IOException {
+        try {
+            if (pendingStorageFile != null && java.nio.file.Files.exists(pendingStorageFile)) {
+                java.nio.file.Files.delete(pendingStorageFile);
+            }
+        } catch (Exception e) {
+            throw new java.io.IOException(e);
         }
     }
 
@@ -406,6 +467,7 @@ public class WebSocketService {
         if (url == null || url.isBlank()) return "http://localhost:8080/ws-connect";
         return url.replace("wss://", "https://").replace("ws://", "http://");
     }
+
     private void handleUnexpectedDisconnect() {
         // ensure scheduler is available for scheduling reconnect attempts
         ensureScheduler();
@@ -420,12 +482,11 @@ public class WebSocketService {
             if (onDisconnected != null) onDisconnected.run();
             return;
         }
-        //pick delay
-        long delayMs = BACKOFF_DELAYS_MS[Math.min(reconnectAttempts, BACKOFF_DELAYS_MS.length - 1)];
-        reconnectAttempts++;
+        int attemptNumber = reconnectAttempts.incrementAndGet();
+        long delayMs = BACKOFF_DELAYS_MS[Math.min(attemptNumber - 1, BACKOFF_DELAYS_MS.length - 1)];
 
         System.out.printf("[WS] Scheduling reconnect attempt #%d in %ds%n",
-                reconnectAttempts, delayMs / 1000);
+                attemptNumber, delayMs / 1000);
 
         if (onReconnecting != null) onReconnecting.run();
 
@@ -435,7 +496,7 @@ public class WebSocketService {
                 if (onDisconnected != null) onDisconnected.run();
                 return;
             }
-            System.out.println("[WS] Attempting reconnect #" + reconnectAttempts + "...");
+            System.out.println("[WS] Attempting reconnect #" + attemptNumber + "...");
 
             // Re-register with the server session BEFORE opening the STOMP connection.
             // This ensures the server has the user in info.editors before flushPendingActions
