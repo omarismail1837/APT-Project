@@ -29,6 +29,10 @@ public class WebSocketService {
     private Runnable onDisconnected;
     private final String docID;
 
+    private Runnable onBeforeReconnectReplay;
+
+    public void setOnBeforeReconnectReplay(Runnable r) { this.onBeforeReconnectReplay = r; }
+
     // Persist pending actions so offline edits survive app restarts.
     private final java.nio.file.Path pendingStorageDir =
             java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "apt_pending_actions");
@@ -245,6 +249,11 @@ public class WebSocketService {
 
                     if (actions != null) {
                         System.out.println("[WS] Applying " + actions.size() + " actions from history.");
+
+                        if (pendingReconnect && onBeforeReconnectReplay != null) {
+                            onBeforeReconnectReplay.run();
+                        }
+
                         for (Action a : actions) {
                             onActionReceived.accept(a);
                         }
