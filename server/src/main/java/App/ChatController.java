@@ -157,6 +157,8 @@ public class ChatController {
             System.out.println(info.viewers);
 
         }
+
+        /* session should close and new codes should be generated
         // if not found in current sessions search in db
         DocMetadata editDoc = docRepository.findByEditCode(code);
         if (editDoc != null) {
@@ -181,7 +183,7 @@ public class ChatController {
             return "viewer:" + viewDoc.getDocId() + ":" + viewDoc.getName() + ":"
                     + info.editCode + ":" + info.viewCode;
         }
-        // not found in sessions or database
+        // not found in sessions or database */
         return "invalid";
     }
 
