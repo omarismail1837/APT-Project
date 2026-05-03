@@ -25,7 +25,7 @@ public class WebSocketService {
     private final AtomicInteger replayState = new AtomicInteger(0);
     private final Runnable onConnected;
     private final ConcurrentHashMap<String, Action> localActionLog = new ConcurrentHashMap<>();
-    // optional hook invoked when the client intentionally disconnects or is disconnected
+    // optional hook 3shan ama el client intentionally ye disconnects aw yb2a disconnected
     private Runnable onDisconnected;
     private final String docID;
 
@@ -33,12 +33,12 @@ public class WebSocketService {
 
     public void setOnBeforeReconnectReplay(Runnable r) { this.onBeforeReconnectReplay = r; }
 
-    // Persist pending actions so offline edits survive app restarts.
+    // persist pending actions so offline edits survive app restarts
     private final java.nio.file.Path pendingStorageDir =
             java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "apt_pending_actions");
     private final java.nio.file.Path pendingStorageFile;
 
-    // Safety timer to prevent getting stuck in "Buffering" forever
+    // safety timer to prevent getting stuck in buffering forever
     private volatile ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     private static final long RECONNECT_WINDOW_MS = 5 * 60 * 1000L; // 5 minutes
@@ -50,11 +50,11 @@ public class WebSocketService {
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private String lastUrl;
 
-    // Set when a reconnect has occurred; cleared once switchToLiveMode fires onReconnected.
+
     private volatile boolean pendingReconnect = false;
     private volatile boolean historyApplied = false;
 
-    // Add a Runnable hook for UI feedback
+    // runnable hook for UI feedback
     private Runnable onReconnecting;
     private Runnable onReconnected;
 
@@ -82,7 +82,6 @@ public class WebSocketService {
         }
     }
 
-    // Ensure the scheduler exists
     private synchronized void ensureScheduler() {
         if (scheduler == null || scheduler.isShutdown() || scheduler.isTerminated()) {
             scheduler = Executors.newScheduledThreadPool(2);
@@ -104,19 +103,16 @@ public class WebSocketService {
         StompSession s = session;
         if (s != null) {
             try {
-                // Ask the STOMP session to disconnect gracefully
+                // ask the STOMP session to disconnect
                 s.disconnect();
 
             } catch (Exception ex) {
-                // disconnect() may throw for already-closed sessions; nothing more we can do here.
                 System.err.println("[WS] Error while disconnecting: " + ex.getMessage());
             }
         }
 
-        // Null out the session reference so callers know we're disconnected
         session = null;
 
-        // Stop the safety scheduler to avoid stray tasks running after disconnect.
         try {
             if (scheduler != null) {
                 scheduler.shutdownNow();
@@ -135,18 +131,18 @@ public class WebSocketService {
     public void connect(String url) {
         this.lastUrl = url;
         this.intentionalDisconnect = false;
-        // Make sure the scheduler available
+
         ensureScheduler();
         String sockJsUrl = normalizeHttpUrl(url);
         connectWithSockJs(sockJsUrl);
     }
 
     private void connectWithSockJs(String url) {
-        // 1. Create the standard client
+        // create the standard client
         StandardWebSocketClient rawClient = new StandardWebSocketClient();
 
-        // 2. Configure the internal container buffer (The "Low Level" Buffer)
-        // This prevents "Max message size exceeded" errors
+        // config the internal container buffer (The "Low Level" Buffer)
+        // this prevents "Max message size exceeded" errors
         rawClient.setUserProperties(Map.of(
                 "org.apache.tomcat.websocket.binaryBufferSize", 10 * 1024 * 1024, // 10MB
                 "org.apache.tomcat.websocket.textBufferSize", 10 * 1024 * 1024   // 10MB
@@ -158,8 +154,8 @@ public class WebSocketService {
         WebSocketStompClient stompClient = new WebSocketStompClient(sockJsClient);
         stompClient.setMessageConverter(new MappingJackson2MessageConverter());
 
-        // 3. Configure STOMP level buffer (The "Message" Buffer)
-        // This controls the maximum size of a single STOMP frame.
+        // config STOMP level buffer (The "Message" Buffer)
+        // thid controls the maximum size of a single STOMP frame
         stompClient.setInboundMessageSizeLimit(10 * 1024 * 1024); // 10MB
 
         org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler taskScheduler =
@@ -223,7 +219,7 @@ public class WebSocketService {
             }
         }, 5, TimeUnit.SECONDS);
 
-        // 1. Live Broadcast
+        //live updates
         session.subscribe("/topic/docs/" + docID + "/updates", new StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) { return Action.class; }
@@ -245,7 +241,7 @@ public class WebSocketService {
             }
         });
 
-        // 2. History
+        // history
         session.subscribe("/app/docs/" + docID + "/initial-state", new StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) { return Object.class; }
@@ -332,7 +328,7 @@ public class WebSocketService {
             onActionReceived.accept(queued);
         }
         if (historyApplied) {
-            // Send any local edits made when disconnected
+            // send any local edits made when disconnected
             flushPendingActions();
         }
 
@@ -426,7 +422,7 @@ public class WebSocketService {
                 System.err.println("[WS] flushPendingActions send failed, re-queuing: " + e.getMessage());
                 pendingActions.offer(next);
                 drained = false;
-                // Schedule a retry so the remaining queue isn't silently abandoned.
+                // schedule a retry so the remaining queue isn't silently abandoned.
                 ensureScheduler();
                 scheduler.schedule(this::flushPendingActions, 2, TimeUnit.SECONDS);
                 break;
@@ -523,9 +519,8 @@ public class WebSocketService {
             }
             System.out.println("[WS] Attempting reconnect #" + attemptNumber + "...");
 
-            // Re-register with the server session BEFORE opening the STOMP connection.
-            // This ensures the server has the user in info.editors before flushPendingActions
-            // sends buffered local edits — otherwise canEdit=false and they are silently dropped.
+            // ree-register with the server session abl opening the stomp connection
+            // sends bufffered local edits otherwise canEdit=false w they are silently droppedd
             if (userId != null && joinCode != null) {
                 try {
                     String urlStr = "https://apt-project-production-326d.up.railway.app/join"
@@ -541,7 +536,6 @@ public class WebSocketService {
                     System.out.println("[WS] Re-joined session for userId=" + userId + " (HTTP " + status + ") response=" + body);
                 } catch (Exception e) {
                     System.err.println("[WS] Re-join failed: " + e.getMessage());
-                    // Proceed anyway — worst case the server will reject edits and we retry
                 }
             }
 

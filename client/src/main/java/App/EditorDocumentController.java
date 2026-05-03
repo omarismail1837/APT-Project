@@ -195,14 +195,12 @@ class EditorDocumentController {
         // Use Try-with-resources to ensure the document and stream close properly
         try (XWPFDocument doc = new XWPFDocument();
              FileOutputStream out = new FileOutputStream(selectedFile)) {
+             XWPFParagraph paragraph = doc.createParagraph();
 
-            // 1. Create the paragraph that will hold your text
-            XWPFParagraph paragraph = doc.createParagraph();
-
-            // 2. Call your new formatting function to fill the paragraph with runs
+            // call el new formatting function to fill the paragraph with runs
             host.getBlockDLL().collectFormattedText(paragraph);
 
-            // 3. Write the actual file data
+            // ne write el actual file data
             doc.write(out);
 
             showExportAlert(Alert.AlertType.INFORMATION, "Export complete",

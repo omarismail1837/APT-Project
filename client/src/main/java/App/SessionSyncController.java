@@ -45,8 +45,6 @@ class SessionSyncController {
         }));
 
         wsService.setOnReconnected(() -> javafx.application.Platform.runLater(() -> {
-            // History has already been replayed and pending local edits flushed by
-            // WebSocketService before this callback fires. Just refresh the UI label.
             if (host.connectedLabel != null) host.connectedLabel.setText("Connected");
         }));
         host.setWsService(wsService);

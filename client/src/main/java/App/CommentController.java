@@ -124,7 +124,6 @@ public class CommentController {
             }
 
             dialog.close();
-            // refresh sidebar here inshallah
         });
 
         cancelBtn.setOnAction(ev -> dialog.close());

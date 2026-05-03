@@ -90,18 +90,13 @@ public class HelloController {
             if (nameInput == null || nameInput.isBlank()) {
                 nameInput = "New Document";
             }
-            // 1. Create a unique ID for the document
+
             String docId = UUID.randomUUID().toString();
-
-            // 2. Register it on the server and get the generated codes
             SessionInfo sessionInfo = getCodesFromServer(docId, nameInput);
-
             String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code=" +
                     sessionInfo.editCode + "&userId=" + userId;
 
             HttpURLConnection conn = (HttpURLConnection) new URL(joinUrl).openConnection();
-
-            // 4. Process the session (this will extract the role and move to the editor)
             processSession(conn, newDocButton, nameInput, null);
         } catch (Exception e) {
             e.printStackTrace();
@@ -146,7 +141,6 @@ public class HelloController {
             boolean canEdit = role.equalsIgnoreCase("editor");
             String finalEditCode = "null".equals(serverEditCode) ? null : serverEditCode;
 
-            // Call loader with the correct order of arguments
             loadEditorScene(actualDocId, docName, viewCode, finalEditCode, canEdit, userId, sourceButton, importContent);
         }
     }
@@ -163,13 +157,12 @@ public class HelloController {
     private void loadEditorScene(String docID, String docName, String viewCode, String editCode,
                                  boolean canEdit, int userId, Button sourceButton,
                                  String importContent) throws IOException {
-        // Ensure you use the correct FXML name (blank-view.fxml or new-doc.fxml)
         URL fxmlUrl = resolveFxml("/App/blank-view.fxml");
         if (fxmlUrl == null) fxmlUrl = resolveFxml("/App/new-doc.fxml");
 
         FXMLLoader loader = new FXMLLoader(fxmlUrl);
 
-        // This is the key: we manually tell the loader how to build BlankController
+        // we manually tell the loader how to build BlankController
         loader.setControllerFactory(type -> {
             if (type == BlankController.class) {
                 return new BlankController(docID, docName, viewCode, editCode, userId, this.blockDLL, canEdit, username, accountId);
@@ -184,7 +177,7 @@ public class HelloController {
         Parent root = loader.load();
         Object controller = loader.getController();
 
-        // after loading, add importContent if not null
+        // after loading, hanadd importContent if not null
         if (importContent != null && controller instanceof BlankController)
         {
             BlankController bc = (BlankController) controller;
@@ -197,7 +190,6 @@ public class HelloController {
 
         Stage stage = (Stage) sourceButton.getScene().getWindow();
 
-        // Make sure the BlankController gets a chance to cleanup (disconnect websocket)
         if (controller instanceof BlankController) {
             BlankController bc = (BlankController) controller;
             stage.setOnCloseRequest(evt -> {
@@ -260,7 +252,6 @@ public class HelloController {
         URL res = HelloApplication.class.getResource(loc);
         if (res != null) return res;
 
-        // FIX: Strip the leading slash so Paths.get treats it as a relative path
         String cleanLoc = loc.startsWith("/") ? loc.substring(1) : loc;
         Path fallback = Paths.get("Client", "src", "main", "resources", cleanLoc);
 
@@ -303,7 +294,7 @@ public class HelloController {
         docsFlowPane.getChildren().clear();
         JSONArray arr = new JSONArray(response);
 
-        // fallback for when user doesnt have any docs
+        // fallback 3shan when user doesnt have any docs
         if (arr.isEmpty()) {
             Label empty = new Label("You don't have any documents yet.\nCreate or import one to get started.");
             empty.setStyle("-fx-text-fill: #888; -fx-font-size: 14px; -fx-text-alignment: center;");
@@ -349,7 +340,7 @@ public class HelloController {
         renameButton.getStyleClass().add("rename-doc-button");
         renameButton.setMaxWidth(Double.MAX_VALUE);
 
-        // Only show rename when user is logged in (server will validate ownership)
+        //  show rename when user is logged in w el server hay validate brdo
         boolean canAttemptRename = accountId != null && !accountId.isBlank();
         renameButton.setVisible(canAttemptRename);
         renameButton.setManaged(canAttemptRename);
@@ -370,7 +361,6 @@ public class HelloController {
                 return;
             }
 
-            // Perform network call off the FX thread
             new Thread(() -> {
                 try {
                     String encodedAccount = URLEncoder.encode(accountId == null ? "" : accountId, StandardCharsets.UTF_8);
@@ -560,7 +550,7 @@ public class HelloController {
         body.put("username", username);
         body.put("password", password);
 
-        // write the json body to the output stream
+        // write el json body to the output stream
         conn.getOutputStream().write(body.toString().getBytes(StandardCharsets.UTF_8));
 
         return readResponse(conn);
@@ -599,10 +589,8 @@ public class HelloController {
     // same as newdoc except name is given
     private void newDocFromImport(String fname, String content) {
         try {
-            // 1. Create a unique ID for the document
-            String docId = UUID.randomUUID().toString();
 
-            // 2. Register it on the server and get the generated codes
+            String docId = UUID.randomUUID().toString();
             SessionInfo sessionInfo = getCodesFromServer(docId, fname);
 
             String joinUrl = "https://apt-project-production-326d.up.railway.app/join?code=" +
