@@ -95,17 +95,20 @@ class SessionSyncController {
             case "UPDATE":
             case "BOLD":
             case "ITALIC":
-            case "HIGHLIGHT":
             case "UNDELETE":
                 String actionId = host.buildActionId(action);
                 if (host.getSeenActionIds().contains(actionId)) return;
 
+                String caretCharId = documentController.resolveCharIDForCaret(host.textArea.getCaretPosition());
+                String anchorCharId = documentController.resolveCharIDForCaret(host.textArea.getAnchor());
+                int caretSnapshot = host.textArea.getCaretPosition();
+                int anchorSnapshot = host.textArea.getAnchor();
+
                 host.getSeenActionIds().add(actionId);
                 host.observeClock(action);
                 host.getBlockDLL().applyAction(action);
-                int caretSnapshot = host.textArea.getCaretPosition();
-                int anchorSnapshot = host.textArea.getAnchor();
                 documentController.rerender(caretSnapshot, anchorSnapshot);
+                refreshLocalCaret(caretCharId, anchorCharId, caretSnapshot, anchorSnapshot);
                 break;
 
             case "RENAME":
@@ -116,6 +119,23 @@ class SessionSyncController {
                 host.getCommentController().receiveRemoteComment(action);
                 break;
         }
+    }
+
+    private void refreshLocalCaret(String caretCharId, String anchorCharId,
+                                   int fallbackCaret, int fallbackAnchor) {
+        if (host.textArea == null) return;
+
+        int newCaret = documentController.resolveTextAreaIndexForCharID(caretCharId);
+        int newAnchor = documentController.resolveTextAreaIndexForCharID(anchorCharId);
+
+        if (newCaret < 0) {
+            newCaret = Math.max(0, Math.min(fallbackCaret, host.textArea.getLength()));
+        }
+        if (newAnchor < 0) {
+            newAnchor = Math.max(0, Math.min(fallbackAnchor, host.textArea.getLength()));
+        }
+
+        host.textArea.selectRange(newAnchor, newCaret);
     }
 
     void close() {
