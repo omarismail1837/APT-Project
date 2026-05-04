@@ -4,6 +4,7 @@ import App.crdt.action.Action;
 import App.crdt.block.BlockNode;
 import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
+import javafx.scene.control.Alert;
 import javafx.scene.control.IndexRange;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
@@ -310,19 +311,58 @@ class EditorDocumentController {
         return visibleNodes.get(index);
     }
 
+
     void exportWordDocument() {
-        Window window = host.textArea != null && host.textArea.getScene() != null ? host.textArea.getScene().getWindow() : null;
-        if (window == null) return;
+        Window window = host.textArea != null && host.textArea.getScene() != null
+                ? host.textArea.getScene().getWindow()
+                : null;
+
+        if (window == null) {
+            showExportAlert(Alert.AlertType.ERROR, "Export failed", "The save dialog could not be opened.");
+            return;
+        }
+
         FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export document");
+        // Change filter to Word documents
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Word Documents", "*.docx"));
+        chooser.setInitialFileName(defaultExportFileName().replace(".txt", ".docx"));
+
         java.io.File selectedFile = chooser.showSaveDialog(window);
         if (selectedFile == null) return;
-        try (XWPFDocument doc = new XWPFDocument(); FileOutputStream out = new FileOutputStream(selectedFile)) {
+
+        // Use Try-with-resources to ensure the document and stream close properly
+        try (XWPFDocument doc = new XWPFDocument();
+             FileOutputStream out = new FileOutputStream(selectedFile)) {
+
+            // 1. Create the paragraph that will hold your text
             XWPFParagraph paragraph = doc.createParagraph();
+
+            // 2. Call your new formatting function to fill the paragraph with runs
             host.getBlockDLL().collectFormattedText(paragraph);
+
+            // 3. Write the actual file data
             doc.write(out);
-        } catch (IOException ignored) {}
+
+            showExportAlert(Alert.AlertType.INFORMATION, "Export complete",
+                    "Saved " + selectedFile.getName() + " to your computer.");
+
+        } catch (IOException ex) {
+            showExportAlert(Alert.AlertType.ERROR, "Export failed", "Could not save the Word file.");
+        }
     }
+
+    private void showExportAlert(Alert.AlertType type, String title, String message) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        if (host.textArea != null && host.textArea.getScene() != null) {
+            alert.initOwner(host.textArea.getScene().getWindow());
+        }
+        alert.showAndWait();
+    }
+
 
     String resolveCharIDForCaret(int caretPos) {
         // If the document is empty, return the starting seed ID
