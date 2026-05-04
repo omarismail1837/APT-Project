@@ -4,7 +4,6 @@ import App.crdt.action.Action;
 import App.crdt.block.BlockNode;
 import App.crdt.character.CharDLL;
 import App.crdt.character.CharNode;
-import javafx.scene.control.Alert;
 import javafx.scene.control.IndexRange;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
@@ -14,11 +13,8 @@ import org.fxmisc.richtext.model.RichTextChange;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 class EditorDocumentController {
 
@@ -49,16 +45,23 @@ class EditorDocumentController {
         host.textArea.multiRichChanges()
                 .filter(changes -> !host.isRemoteUpdate())
                 .subscribe(changes -> {
-                    pendingUndoBatch.clear();                          // start fresh batch
+                    pendingUndoBatch.clear();
                     changes.forEach(this::processRichChange);
+
                     if (!pendingUndoBatch.isEmpty()) {
                         undoRedoManager.pushUndo(new java.util.ArrayList<>(pendingUndoBatch));
                         redoRemapTable.clear();
                     }
+
                     int caretSnapshot = host.textArea.getCaretPosition();
                     javafx.application.Platform.runLater(() -> {
+                        // Rerender first to stabilize the view[cite: 4]
                         rerender(caretSnapshot, caretSnapshot);
-                        host.getPresenceController().broadcastCursorPosition(host.textArea.getCaretPosition(), true);
+
+                        // Broadcast second so other users get the post-render index[cite: 4]
+                        host.getPresenceController().broadcastCursorPosition(
+                                host.textArea.getCaretPosition(), true
+                        );
                     });
                 });
     }
@@ -79,6 +82,7 @@ class EditorDocumentController {
                 applyAndTrack(action);
             }
             refreshMapping();
+            // Pruning is now handled centrally in rerender()[cite: 4]
         }
         host.getPresenceController().setLastDeletionStart(idx);
 
@@ -100,25 +104,21 @@ class EditorDocumentController {
         }
     }
 
-    void applyAndSend(Action action) {
-        host.getBlockDLL().applyAction(action);
-        host.getSeenActionIds().add(host.buildActionId(action));
-        if (host.getWsService() != null) {
-            host.getWsService().sendAction(action);
-        }
-    }
-
     void rerender(int preferredCaret, int preferredAnchor) {
         host.withRemoteFlag(() -> {
             refreshMapping();
+
+            host.getCommentController().pruneDeletedComments();
+
             host.textArea.replaceText(host.getBlockDLL().collectText());
+
             applyStyles();
 
             int safeAnchor = Math.max(0, Math.min(preferredAnchor, host.textArea.getLength()));
             int safeCaret = Math.max(0, Math.min(preferredCaret, host.textArea.getLength()));
             host.textArea.selectRange(safeAnchor, safeCaret);
 
-            javafx.application.Platform.runLater(() -> host.getPresenceController().updateRemoteCarets());
+            host.getPresenceController().updateRemoteCarets();
         });
     }
 
@@ -131,115 +131,16 @@ class EditorDocumentController {
         }
     }
 
-    void toggleBold() {
-        applyFormattingAction("BOLD", CharNode::getBold);
-    }
-
-    void toggleItalic() {
-        applyFormattingAction("ITALIC", CharNode::getItalic);
-    }
-
-    void highlight() {
-        applyFormattingAction("HIGHLIGHT", CharNode::getHighlighted);
-    }
-
-    void exportDocument() {
-        Window window = host.textArea != null && host.textArea.getScene() != null
-                ? host.textArea.getScene().getWindow()
-                : null;
-        if (window == null) {
-            showExportAlert(Alert.AlertType.ERROR, "Export failed", "The save dialog could not be opened.");
-            return;
-        }
-
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Export document");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text files", "*.docx"));
-        chooser.setInitialFileName(defaultExportFileName());
-
-        java.nio.file.Path targetPath;
-        try {
-            java.io.File selectedFile = chooser.showSaveDialog(window);
-            if (selectedFile == null) return;
-
-            targetPath = selectedFile.toPath();
-            Files.writeString(targetPath, host.getBlockDLL().collectText(), StandardCharsets.UTF_8);
-        } catch (IOException ex) {
-            showExportAlert(Alert.AlertType.ERROR, "Export failed", "Could not save the text file.");
-            return;
-        }
-
-        showExportAlert(Alert.AlertType.INFORMATION, "Export complete",
-                "Saved " + targetPath.getFileName() + " to your computer.");
-    }
-
-    void exportWordDocument() {
-        Window window = host.textArea != null && host.textArea.getScene() != null
-                ? host.textArea.getScene().getWindow()
-                : null;
-
-        if (window == null) {
-            showExportAlert(Alert.AlertType.ERROR, "Export failed", "The save dialog could not be opened.");
-            return;
-        }
-
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Export document");
-        // Change filter to Word documents
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Word Documents", "*.docx"));
-        chooser.setInitialFileName(defaultExportFileName().replace(".txt", ".docx"));
-
-        java.io.File selectedFile = chooser.showSaveDialog(window);
-        if (selectedFile == null) return;
-
-        // Use Try-with-resources to ensure the document and stream close properly
-        try (XWPFDocument doc = new XWPFDocument();
-             FileOutputStream out = new FileOutputStream(selectedFile)) {
-
-            // 1. Create the paragraph that will hold your text
-            XWPFParagraph paragraph = doc.createParagraph();
-
-            // 2. Call your new formatting function to fill the paragraph with runs
-            host.getBlockDLL().collectFormattedText(paragraph);
-
-            // 3. Write the actual file data
-            doc.write(out);
-
-            showExportAlert(Alert.AlertType.INFORMATION, "Export complete",
-                    "Saved " + selectedFile.getName() + " to your computer.");
-
-        } catch (IOException ex) {
-            showExportAlert(Alert.AlertType.ERROR, "Export failed", "Could not save the Word file.");
-        }
-    }
+    void toggleBold() { applyFormattingAction("BOLD", CharNode::getBold); }
+    void toggleItalic() { applyFormattingAction("ITALIC", CharNode::getItalic); }
+    void highlight() { applyFormattingAction("HIGHLIGHT", CharNode::getHighlighted); }
 
     int resolveTextAreaIndexForCharID(String charID) {
-        if (charID == null || charID.equals(getSeedHeadID())) {
-            return 0;
-        }
-
+        if (charID == null || charID.equals(getSeedHeadID())) return 0;
         for (int i = 0; i < visibleNodes.size(); i++) {
-            if (charID.equals(visibleNodes.get(i).getCharID())) {
-                return i + 1;
-            }
+            if (charID.equals(visibleNodes.get(i).getCharID())) return i + 1;
         }
-
-        return -1; // character was deleted
-    }
-
-    String resolveCharIDForCaret(int caretPos) {
-        if (visibleNodes.isEmpty()) return getSeedHeadID();
-        if (caretPos <= 0) return getSeedHeadID();
-
-        int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1; // already has this
-        if (anchorIndex < 0 || anchorIndex >= visibleNodes.size()) return getSeedHeadID(); // add this
-        return visibleNodes.get(anchorIndex).getCharID();
-    }
-
-    void refreshUI() {
-        host.getPresenceController().updateActiveUsersPanel();
-        applyStyles();
-        host.getPresenceController().updateRemoteCarets();
+        return -1;
     }
 
     void refreshMapping() {
@@ -287,31 +188,86 @@ class EditorDocumentController {
         undoRedoManager.pushUndo(new ArrayList<>(pendingUndoBatch));
         redoRemapTable.clear();
         pendingUndoBatch.clear();
-        int caretSnapshot = host.textArea.getCaretPosition();
-        int anchorSnapshot = host.textArea.getAnchor();
-        rerender(caretSnapshot, anchorSnapshot);
+        rerender(host.textArea.getCaretPosition(), host.textArea.getAnchor());
     }
 
-    private String defaultExportFileName() {
-        String baseName = (host.getDocName() == null || host.getDocName().isBlank())
-                ? "document"
-                : host.getDocName().trim();
-        if (baseName.toLowerCase(Locale.ROOT).endsWith(".txt")) {
-            return baseName;
+    void undo() {
+        List<Action> batch = undoRedoManager.popUndo();
+        if (batch == null) return;
+        for (int i = batch.size() - 1; i >= 0; i--) {
+            Action inv = buildInverse(batch.get(i));
+            if (inv != null) applyAndSend(inv);
         }
-        return baseName + ".txt";
+        undoRedoManager.pushRedo(batch);
+        rerender(host.textArea.getCaretPosition(), host.textArea.getCaretPosition());
     }
 
-    private void showExportAlert(Alert.AlertType type, String title, String message) {
-        Alert alert = new Alert(type);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        if (host.textArea != null && host.textArea.getScene() != null) {
-            alert.initOwner(host.textArea.getScene().getWindow());
+    void redo() {
+        List<Action> batch = undoRedoManager.popRedo();
+        if (batch == null) return;
+        List<Action> reappliedBatch = new ArrayList<>();
+        for (Action orig : batch) {
+            Action reinsertion = buildReinsertion(orig, redoRemapTable);
+            if (reinsertion != null) {
+                applyAndSend(reinsertion);
+                reappliedBatch.add(reinsertion);
+                if ("INSERT".equals(orig.getActionType())) redoRemapTable.put(originalCharID(orig), appliedCharID(reinsertion));
+            }
         }
-        alert.showAndWait();
+        undoRedoManager.pushUndoKeepRedo(reappliedBatch);
+        rerender(host.textArea.getCaretPosition(), host.textArea.getCaretPosition());
     }
+
+    void applyAndSend(Action action) {
+        host.getBlockDLL().applyAction(action);
+        host.getSeenActionIds().add(host.buildActionId(action));
+        if (host.getWsService() != null) host.getWsService().sendAction(action);
+    }
+
+    private void applyAndTrack(Action action) {
+        host.getBlockDLL().applyAction(action);
+        host.getSeenActionIds().add(host.buildActionId(action));
+        pendingUndoBatch.add(action);
+        if (host.getWsService() != null) host.getWsService().sendAction(action);
+    }
+
+    private Action buildInverse(Action orig) {
+        long newClock = host.nextClock();
+        long now = host.now();
+        int site = host.getMySiteID();
+        String doc = host.getDocID();
+        switch (orig.getActionType()) {
+            case "INSERT": return new Action(newClock, now, site, doc, "DELETE", appliedCharID(orig), null, null);
+            case "DELETE": return new Action(newClock, now, site, doc, "UNDELETE", orig.getStartCharID(), null, null);
+            case "UNDELETE": return new Action(newClock, now, site, doc, "DELETE", orig.getStartCharID(), null, null);
+            case "BOLD": case "ITALIC": case "HIGHLIGHT":
+                String flipped = "true".equalsIgnoreCase(orig.getExtraData()) ? "false" : "true";
+                return new Action(newClock, now, site, doc, orig.getActionType(), orig.getStartCharID(), orig.getEndCharID(), flipped);
+            default: return null;
+        }
+    }
+
+    private Action buildReinsertion(Action orig, java.util.Map<String, String> remappedCharIds) {
+        long newClock = host.nextClock();
+        long now = host.now();
+        int site = host.getMySiteID();
+        String doc = host.getDocID();
+        switch (orig.getActionType()) {
+            case "INSERT": return new Action(newClock, now, site, doc, "INSERT", remapCharID(orig.getStartCharID(), remappedCharIds), null, orig.getExtraData());
+            case "DELETE": return new Action(newClock, now, site, doc, "DELETE", remapCharID(orig.getStartCharID(), remappedCharIds), null, null);
+            case "UNDELETE": return new Action(newClock, now, site, doc, "UNDELETE", remapCharID(orig.getStartCharID(), remappedCharIds), null, null);
+            case "BOLD": case "ITALIC": return new Action(newClock, now, site, doc, orig.getActionType(), remapCharID(orig.getStartCharID(), remappedCharIds), remapCharID(orig.getEndCharID(), remappedCharIds), orig.getExtraData());
+            default: return null;
+        }
+    }
+
+    private String remapCharID(String charID, java.util.Map<String, String> remappedCharIds) {
+        if (charID == null || remappedCharIds == null || remappedCharIds.isEmpty()) return charID;
+        return remappedCharIds.getOrDefault(charID, charID);
+    }
+
+    private String originalCharID(Action action) { return action.getSiteID() + "-" + action.getClock(); }
+    private String appliedCharID(Action action) { return action.getSiteID() + "-" + action.getClock(); }
 
     private String resolveBaseClass(CharNode node) {
         String base;
@@ -319,15 +275,12 @@ class EditorDocumentController {
         else if (node.getBold()) base = "bold";
         else if (node.getItalic()) base = "italic";
         else base = "regular";
-
         return node.getHighlighted() ? base + "-highlighted" : base;
     }
 
     private void ensureSeedBlock() {
         BlockNode root = host.getBlockDLL().getBlock("ROOT");
-        if (root == null) return;
-        if (root.getNext() != null && root.getNext().getContent() != null) return;
-
+        if (root == null || (root.getNext() != null && root.getNext().getContent() != null)) return;
         CharDLL seedContent = new CharDLL(0, 1, 0L);
         BlockNode seedBlock = new BlockNode(0, 2, 0L, seedContent, "ROOT");
         host.getBlockDLL().insert(seedBlock);
@@ -341,192 +294,92 @@ class EditorDocumentController {
 
     private String resolveParentIDForInsert(int textAreaIndex, String rootID) {
         if (visibleNodes.isEmpty() || textAreaIndex == 0) return rootID;
-        int idx = Math.min(textAreaIndex, visibleNodes.size()) - 1;
-        return visibleNodes.get(idx).getCharID();
+        return visibleNodes.get(Math.min(textAreaIndex, visibleNodes.size()) - 1).getCharID();
     }
 
     private String resolveInsertedCharID(long insertClock) {
         refreshMapping();
         for (CharNode node : visibleNodes) {
-            if (node.getSiteID() == host.getMySiteID() && node.getClock() == insertClock) {
-                return node.getCharID();
-            }
+            if (node.getSiteID() == host.getMySiteID() && node.getClock() == insertClock) return node.getCharID();
         }
         return getSeedHeadID();
     }
 
-    private void applyAndTrack(Action action) {
-        host.getBlockDLL().applyAction(action);
-        host.getSeenActionIds().add(host.buildActionId(action));
-        pendingUndoBatch.add(action);
-        if (host.getWsService() != null) {
-            host.getWsService().sendAction(action);
-        }
-    }
-
-    void undo() {
-        List<Action> batch = undoRedoManager.popUndo();
-        if (batch == null) return;
-
-        for (int i = batch.size() - 1; i >= 0; i--) {
-            Action inv = buildInverse(batch.get(i));
-            if (inv == null) continue;
-            host.getBlockDLL().applyAction(inv);
-            host.getSeenActionIds().add(host.buildActionId(inv));
-            if (host.getWsService() != null) host.getWsService().sendAction(inv);
-        }
-
-        undoRedoManager.pushRedo(batch);
-
-        int caret = host.textArea.getCaretPosition();
-        rerender(caret, caret);
-    }
-
-    void redo() {
-        List<Action> batch = undoRedoManager.popRedo();
-        if (batch == null) return;
-
-        List<Action> reappliedBatch = new java.util.ArrayList<>();
-
-        for (Action orig : batch) {
-            Action reinsertion = buildReinsertion(orig, redoRemapTable);
-            if (reinsertion == null) continue;
-            host.getBlockDLL().applyAction(reinsertion);
-            host.getSeenActionIds().add(host.buildActionId(reinsertion));
-            if (host.getWsService() != null) host.getWsService().sendAction(reinsertion);
-            reappliedBatch.add(reinsertion);
-
-            if ("INSERT".equals(orig.getActionType())) {
-                redoRemapTable.put(originalCharID(orig), appliedCharID(reinsertion));
-            }
-        }
-
-        undoRedoManager.pushUndoKeepRedo(reappliedBatch);
-
-        int caret = host.textArea.getCaretPosition();
-        rerender(caret, caret);
-    }
-
-    private Action buildInverse(Action orig) {
-        long newClock = host.nextClock();
-        long now      = host.now();
-        int  site     = host.getMySiteID();
-        String doc    = host.getDocID();
-
-        switch (orig.getActionType()) {
-            case "INSERT":
-                return new Action(newClock, now, site, doc,
-                        "DELETE", appliedCharID(orig), null, null);
-
-            case "DELETE":
-                return new Action(newClock, now, site, doc,
-                        "UNDELETE", orig.getStartCharID(), null, null);
-
-            case "UNDELETE":
-                return new Action(newClock, now, site, doc,
-                        "DELETE", orig.getStartCharID(), null, null);
-
-            case "BOLD":
-            case "ITALIC":
-            case "HIGHLIGHT": {
-                String flipped = "true".equalsIgnoreCase(orig.getExtraData()) ? "false" : "true";
-                return new Action(newClock, now, site, doc,
-                        orig.getActionType(),
-                        orig.getStartCharID(), orig.getEndCharID(), flipped);
-            }
-
-            default:
-                return null;
-        }
-    }
-    private App.crdt.character.CharNode findNodeByID(String charID) {
-        if (charID == null) return null;
-        App.crdt.block.BlockNode block = host.getBlockDLL().getBlock("ROOT");
-        if (block == null) return null;
-        block = block.getNext();
-        while (block != null) {
-            if (block.getContent() != null) {
-                App.crdt.character.CharNode c = block.getContent().getHead().getNext();
-                while (c != null) {
-                    if (charID.equals(c.getCharID())) return c;
-                    c = c.getNext();
-                }
-            }
-            block = block.getNext();
-        }
-        return null;
-    }
-
-    private Action buildReinsertion(Action orig, java.util.Map<String, String> remappedCharIds) {
-        long newClock = host.nextClock();
-        long now      = host.now();
-        int  site     = host.getMySiteID();
-        String doc    = host.getDocID();
-
-        switch (orig.getActionType()) {
-            case "INSERT":
-                return new Action(newClock, now, site, doc,
-                        "INSERT", remapCharID(orig.getStartCharID(), remappedCharIds), null, orig.getExtraData());
-
-            case "DELETE":
-                return new Action(newClock, now, site, doc,
-                        "DELETE", remapCharID(orig.getStartCharID(), remappedCharIds), null, null);
-
-            case "UNDELETE":
-                return new Action(newClock, now, site, doc,
-                        "UNDELETE", remapCharID(orig.getStartCharID(), remappedCharIds), null, null);
-
-            case "BOLD":
-            case "ITALIC":
-                return new Action(newClock, now, site, doc,
-                        orig.getActionType(),
-                        remapCharID(orig.getStartCharID(), remappedCharIds),
-                        remapCharID(orig.getEndCharID(), remappedCharIds),
-                        orig.getExtraData());
-
-            default:
-                return null;
-        }
-    }
-
-    private String remapCharID(String charID, java.util.Map<String, String> remappedCharIds) {
-        if (charID == null || remappedCharIds == null || remappedCharIds.isEmpty()) return charID;
-        return remappedCharIds.getOrDefault(charID, charID);
-    }
-
-    private String originalCharID(Action action) {
-        if (action == null) return null;
-        return action.getSiteID() + "-" + action.getClock();
-    }
-
-    private String appliedCharID(Action action) {
-        if (action == null) return null;
-        return action.getSiteID() + "-" + action.getClock();
-    }
-
-    // for commentcontroller
     CharNode getVisibleNode(int index) {
         if (index < 0 || index >= visibleNodes.size()) return null;
         return visibleNodes.get(index);
     }
 
+    void exportWordDocument() {
+        Window window = host.textArea != null && host.textArea.getScene() != null ? host.textArea.getScene().getWindow() : null;
+        if (window == null) return;
+        FileChooser chooser = new FileChooser();
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Word Documents", "*.docx"));
+        java.io.File selectedFile = chooser.showSaveDialog(window);
+        if (selectedFile == null) return;
+        try (XWPFDocument doc = new XWPFDocument(); FileOutputStream out = new FileOutputStream(selectedFile)) {
+            XWPFParagraph paragraph = doc.createParagraph();
+            host.getBlockDLL().collectFormattedText(paragraph);
+            doc.write(out);
+        } catch (IOException ignored) {}
+    }
+
+    String resolveCharIDForCaret(int caretPos) {
+        // If the document is empty, return the starting seed ID
+        if (visibleNodes.isEmpty()) return getSeedHeadID();
+
+        // If the caret is at the very beginning (index 0), it points to the seed
+        if (caretPos <= 0) return getSeedHeadID();
+
+        // Map the index to the visible node list, ensuring it stays within bounds[cite: 4]
+        int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
+
+        // Safety check: if index is invalid, fall back to the seed[cite: 4]
+        if (anchorIndex < 0 || anchorIndex >= visibleNodes.size()) {
+            return getSeedHeadID();
+        }
+
+        // Return the unique ID for the character at that position[cite: 4]
+        return visibleNodes.get(anchorIndex).getCharID();
+    }
+
+    void refreshUI() {
+        // 1. Force a full re-render
+        // This triggers refreshMapping() and pruneDeletedComments() automatically
+        int caret = host.textArea.getCaretPosition();
+        rerender(caret, caret);
+
+        // 2. Explicitly refresh the comments sidebar to match the pruned state[cite: 5]
+        host.getCommentController().refreshCommentsSidebar();
+
+        // 3. Synchronize collaboration UI components
+        host.getPresenceController().updateActiveUsersPanel();
+        host.getPresenceController().updateRemoteCarets();
+    }
+
+    private String defaultExportFileName() {
+        String baseName = (host.getDocName() == null || host.getDocName().isBlank()) ? "document" : host.getDocName().trim();
+        return baseName.toLowerCase().endsWith(".txt") ? baseName : baseName + ".txt";
+    }
+
     void pasteWithFormatting(int replaceStart, int replaceEnd,
-                             String text, List<boolean[]> snapshot) {
-        suppressUndoPush = true;
+                            String text, List<boolean[]> snapshot) {
+        suppressUndoPush = true; // Prevents individual actions from creating multiple undo steps[cite: 4]
         pendingUndoBatch.clear();
 
         try {
+            // 1. Perform the text replacement in the UI component[cite: 4]
             host.textArea.replaceText(replaceStart, replaceEnd, text);
         } finally {
             javafx.application.Platform.runLater(() -> {
                 try {
-                    // 2. Apply formatting — adds BOLD/ITALIC actions to same batch
+                    // 2. Apply formatting — adds BOLD/ITALIC actions to the current pending batch[cite: 4]
                     if (snapshot != null && !snapshot.isEmpty()) {
                         int insertEnd = replaceStart + text.length();
                         applyFormattingSnapshot(replaceStart, insertEnd, snapshot, false);
                     }
                 } finally {
-                    // 3. Push the entire batch as ONE undo entry
+                    // 3. Finalize the batch and push it to the Undo Manager[cite: 4]
                     suppressUndoPush = false;
                     if (!pendingUndoBatch.isEmpty()) {
                         undoRedoManager.pushUndo(new ArrayList<>(pendingUndoBatch));
@@ -534,19 +387,18 @@ class EditorDocumentController {
                         pendingUndoBatch.clear();
                     }
                     int caret = host.textArea.getCaretPosition();
-                    rerender(caret, caret); // single rerender at the very end
+                    rerender(caret, caret); // Single rerender at the end for efficiency[cite: 4]
                 }
             });
         }
     }
-
 
     List<boolean[]> snapshotSelectionFormatting() {
         IndexRange selection = host.textArea.getSelection();
         if (selection.getLength() == 0) return null;
 
         int start = selection.getStart();
-        int end = selection.getEnd(); // exclusive
+        int end = selection.getEnd(); // Exclusive index[cite: 4]
 
         List<boolean[]> snapshot = new ArrayList<>();
         for (int i = start; i < end && i < visibleNodes.size(); i++) {
@@ -556,13 +408,14 @@ class EditorDocumentController {
         return snapshot;
     }
 
-
     void applyFormattingSnapshot(int insertStart, int insertEnd,
                                  List<boolean[]> snapshot, boolean doRerender) {
         if (snapshot == null || snapshot.isEmpty()) return;
         if (insertStart < 0 || insertEnd > visibleNodes.size()) return;
 
         int len = Math.min(insertEnd - insertStart, snapshot.size());
+
+        // Apply bold and italic runs separately[cite: 4]
         applyFormattingRuns(insertStart, len, snapshot, 0, "BOLD");
         applyFormattingRuns(insertStart, len, snapshot, 1, "ITALIC");
 
@@ -578,11 +431,14 @@ class EditorDocumentController {
         int runStart = -1;
         for (int i = 0; i <= len; i++) {
             boolean active = i < len && snapshot.get(i)[formatIndex];
+
             if (active && runStart == -1) {
-                runStart = i;
+                runStart = i; // Start of a formatted run[cite: 4]
             } else if (!active && runStart != -1) {
+                // End of a run detected; create a single Action for the range[cite: 4]
                 CharNode startNode = visibleNodes.get(insertStart + runStart);
                 CharNode endNode   = visibleNodes.get(insertStart + i - 1);
+
                 Action action = new Action(
                         host.nextClock(), host.now(), host.getMySiteID(), host.getDocID(),
                         actionType,
@@ -590,7 +446,7 @@ class EditorDocumentController {
                         endNode.getCharID(),
                         "true"
                 );
-                applyAndTrack(action); // just accumulates into pendingUndoBatch
+                applyAndTrack(action); // Accumulates into the pending batch[cite: 4]
                 runStart = -1;
             }
         }
