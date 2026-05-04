@@ -15,7 +15,7 @@ import java.util.Map;
 public class CommentController {
     private final BlankController host;
 
-    // Key: "startCharID|endCharID" ensures stability across edits[cite: 5]
+    // Key: "startCharID|endCharID" ensures stability across edits
     private final Map<String, Comment> comments = new LinkedHashMap<>();
 
     CommentController(BlankController host) {
@@ -74,12 +74,12 @@ public class CommentController {
                 CharNode endNode = host.getDocumentController().getVisibleNode(end - 1);
 
                 if (startNode != null && endNode != null) {
-                    // Stable mapping using CharIDs[cite: 5]
+                    // Stable mapping using CharIDs
                     String key = startNode.getCharID() + "|" + endNode.getCharID();
                     comments.put(key, new Comment(host.getPresenceController().getDisplayName(), text));
 
                     host.textArea.selectRange(start, end);
-                    host.getDocumentController().highlight(); // Highlight persistent visual range[cite: 5]
+                    host.getDocumentController().highlight(); // Highlight persistent visual range
                     host.textArea.deselect();
                     refreshCommentsSidebar();
 
@@ -123,7 +123,7 @@ public class CommentController {
             String[] parts = key.split("\\|", 2);
             if (parts.length < 2) { it.remove(); changed = true; continue; }
 
-            // Comment survives if AT LEAST one character in its range is still visible[cite: 5]
+            // Comment survives if AT LEAST one character in its range is still visible
             if (!hasVisibleCharactersInRange(parts[0], parts[1])) {
                 it.remove();
                 changed = true;
@@ -142,7 +142,7 @@ public class CommentController {
                 CharNode c = block.getContent().getHead().getNext();
                 while (c != null) {
                     if (c.getCharID().equals(startCharID)) inRange = true;
-                    // If we find any character that is not deleted within the bounds, the comment stays[cite: 5]
+                    // If we find any character that is not deleted within the bounds, the comment stays
                     if (inRange && !block.isDeleted() && !c.getIsDeleted()) return true;
                     if (c.getCharID().equals(endCharID)) return false;
                     c = c.getNext();
