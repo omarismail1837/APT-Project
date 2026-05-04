@@ -56,10 +56,10 @@ class EditorDocumentController {
 
                     int caretSnapshot = host.textArea.getCaretPosition();
                     javafx.application.Platform.runLater(() -> {
-                        // Rerender first to stabilize the view[cite: 4]
+                        // rerender first to stabilize the view[cite: 4]
                         rerender(caretSnapshot, caretSnapshot);
 
-                        // Broadcast second so other users get the post-render index[cite: 4]
+                        // broadcast second so other users get the post-render index[cite: 4]
                         host.getPresenceController().broadcastCursorPosition(
                                 host.textArea.getCaretPosition(), true
                         );
@@ -324,24 +324,19 @@ class EditorDocumentController {
 
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Export document");
-        // Change filter to Word documents
+
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Word Documents", "*.docx"));
         chooser.setInitialFileName(defaultExportFileName().replace(".txt", ".docx"));
 
         java.io.File selectedFile = chooser.showSaveDialog(window);
         if (selectedFile == null) return;
 
-        // Use Try-with-resources to ensure the document and stream close properly
+        // been3mel try catch 3shan el stream y close properly
         try (XWPFDocument doc = new XWPFDocument();
              FileOutputStream out = new FileOutputStream(selectedFile)) {
 
-            // 1. Create the paragraph that will hold your text
             XWPFParagraph paragraph = doc.createParagraph();
-
-            // 2. Call your new formatting function to fill the paragraph with runs
             host.getBlockDLL().collectFormattedText(paragraph);
-
-            // 3. Write the actual file data
             doc.write(out);
 
             showExportAlert(Alert.AlertType.INFORMATION, "Export complete",
@@ -365,34 +360,29 @@ class EditorDocumentController {
 
 
     String resolveCharIDForCaret(int caretPos) {
-        // If the document is empty, return the starting seed ID
+
         if (visibleNodes.isEmpty()) return getSeedHeadID();
 
-        // If the caret is at the very beginning (index 0), it points to the seed
         if (caretPos <= 0) return getSeedHeadID();
 
-        // Map the index to the visible node list, ensuring it stays within bounds[cite: 4]
+        // map the index to the visible node list, ensuring it stays within bounds[cite: 4]
         int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
 
-        // Safety check: if index is invalid, fall back to the seed[cite: 4]
+        // safety check
         if (anchorIndex < 0 || anchorIndex >= visibleNodes.size()) {
             return getSeedHeadID();
         }
 
-        // Return the unique ID for the character at that position[cite: 4]
         return visibleNodes.get(anchorIndex).getCharID();
     }
 
     void refreshUI() {
-        // 1. Force a full re-render
-        // This triggers refreshMapping() and pruneDeletedComments() automatically
+
         int caret = host.textArea.getCaretPosition();
         rerender(caret, caret);
 
-        // 2. Explicitly refresh the comments sidebar to match the pruned state[cite: 5]
         host.getCommentController().refreshCommentsSidebar();
 
-        // 3. Synchronize collaboration UI components
         host.getPresenceController().updateActiveUsersPanel();
         host.getPresenceController().updateRemoteCarets();
     }
@@ -404,7 +394,7 @@ class EditorDocumentController {
 
     void pasteWithFormatting(int replaceStart, int replaceEnd,
                             String text, List<boolean[]> snapshot) {
-        suppressUndoPush = true; // Prevents individual actions from creating multiple undo steps[cite: 4]
+        suppressUndoPush = true;
         pendingUndoBatch.clear();
 
         try {
@@ -412,13 +402,13 @@ class EditorDocumentController {
         } finally {
             javafx.application.Platform.runLater(() -> {
                 try {
-                    // 2. Apply formatting — adds BOLD/ITALIC actions to same batch
+
                     if (snapshot != null && !snapshot.isEmpty()) {
                         int insertEnd = replaceStart + text.length();
                         applyFormattingSnapshot(replaceStart, insertEnd, snapshot, false);
                     }
                 } finally {
-                    // 3. Push the entire batch as ONE undo entry
+
                     suppressUndoPush = false;
                     if (!pendingUndoBatch.isEmpty()) {
                         undoRedoManager.pushUndo(new ArrayList<>(pendingUndoBatch));
@@ -437,7 +427,7 @@ class EditorDocumentController {
         if (selection.getLength() == 0) return null;
 
         int start = selection.getStart();
-        int end = selection.getEnd(); // Exclusive index[cite: 4]
+        int end = selection.getEnd();
 
         List<boolean[]> snapshot = new ArrayList<>();
         for (int i = start; i < end && i < visibleNodes.size(); i++) {
@@ -454,7 +444,7 @@ class EditorDocumentController {
 
         int len = Math.min(insertEnd - insertStart, snapshot.size());
 
-        // Apply bold and italic runs separately[cite: 4]
+        // apply bold and italic runs separately[cite: 4]
         applyFormattingRuns(insertStart, len, snapshot, 0, "BOLD");
         applyFormattingRuns(insertStart, len, snapshot, 1, "ITALIC");
 
@@ -471,9 +461,9 @@ class EditorDocumentController {
         for (int i = 0; i <= len; i++) {
             boolean active = i < len && snapshot.get(i)[formatIndex];
             if (active && runStart == -1) {
-                runStart = i; // Start of a formatted run[cite: 4]
+                runStart = i;
             } else if (!active && runStart != -1) {
-                // End of a run detected; create a single Action for the range[cite: 4]
+
                 CharNode startNode = visibleNodes.get(insertStart + runStart);
                 CharNode endNode   = visibleNodes.get(insertStart + i - 1);
 
@@ -484,7 +474,7 @@ class EditorDocumentController {
                         endNode.getCharID(),
                         "true"
                 );
-                applyAndTrack(action); // Accumulates into the pending batch[cite: 4]
+                applyAndTrack(action); // accumulate into the pending batch[cite: 4]
                 runStart = -1;
             }
         }
