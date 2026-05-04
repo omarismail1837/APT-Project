@@ -159,7 +159,6 @@ public class BlankController implements Initializable {
         if (text == null || text.isEmpty()) return;
 
         List<boolean[]> snapshot = clipboardStyling;
-        clipboardStyling = null;
 
         IndexRange selection = textArea.getSelection();
         documentController.pasteWithFormatting(
