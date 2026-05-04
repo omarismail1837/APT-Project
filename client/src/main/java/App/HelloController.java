@@ -141,6 +141,7 @@ public class HelloController {
             boolean canEdit = role.equalsIgnoreCase("editor");
             String finalEditCode = "null".equals(serverEditCode) ? null : serverEditCode;
 
+            //el editor screen nefta7o
             loadEditorScene(actualDocId, docName, viewCode, finalEditCode, canEdit, userId, sourceButton, importContent);
         }
     }
@@ -177,7 +178,7 @@ public class HelloController {
         Parent root = loader.load();
         Object controller = loader.getController();
 
-        // after loading, hanadd importContent if not null
+        // after loading, hanaddy importContent if not null: beyeb2a mawgod fy 7alet enaha got called gowa newDocFromImport(...)
         if (importContent != null && controller instanceof BlankController)
         {
             BlankController bc = (BlankController) controller;
@@ -187,7 +188,7 @@ public class HelloController {
 
         URL cssUrl = HelloApplication.class.getResource("/App/editor.css");
         if (cssUrl != null) scene.getStylesheets().add(cssUrl.toExternalForm());
-
+        //ama yb2a ma3ana stage hane2dar ne replace el dasboard page b el editor ely 3ayzen nefta7o rn
         Stage stage = (Stage) sourceButton.getScene().getWindow();
 
         if (controller instanceof BlankController) {
