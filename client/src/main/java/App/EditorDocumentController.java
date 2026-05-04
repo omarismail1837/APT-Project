@@ -56,10 +56,11 @@ class EditorDocumentController {
 
                     int caretSnapshot = host.textArea.getCaretPosition();
                     javafx.application.Platform.runLater(() -> {
-                        // rerender first to stabilize the view[cite: 4]
+                        // rerender first to stabilize the view
+                        rerender(caretSnapshot, caretSnapshot);
                         rerender(caretSnapshot, caretSnapshot);
 
-                        // broadcast second so other users get the post-render index[cite: 4]
+                        // broadcast second so other users get the post-render index
                         host.getPresenceController().broadcastCursorPosition(
                                 host.textArea.getCaretPosition(), true
                         );
@@ -365,7 +366,7 @@ class EditorDocumentController {
 
         if (caretPos <= 0) return getSeedHeadID();
 
-        // map the index to the visible node list, ensuring it stays within bounds[cite: 4]
+        // map the index to the visible node list, ensuring it stays within bounds
         int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
 
         // safety check
