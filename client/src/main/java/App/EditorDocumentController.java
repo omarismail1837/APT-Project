@@ -56,10 +56,11 @@ class EditorDocumentController {
 
                     int caretSnapshot = host.textArea.getCaretPosition();
                     javafx.application.Platform.runLater(() -> {
-                        // Rerender first to stabilize the view[cite: 4]
+                        // Rerender first to stabilize the view
+                        rerender(caretSnapshot, caretSnapshot);
                         rerender(caretSnapshot, caretSnapshot);
 
-                        // Broadcast second so other users get the post-render index[cite: 4]
+                        // Broadcast second so other users get the post-render index
                         host.getPresenceController().broadcastCursorPosition(
                                 host.textArea.getCaretPosition(), true
                         );
@@ -371,15 +372,15 @@ class EditorDocumentController {
         // If the caret is at the very beginning (index 0), it points to the seed
         if (caretPos <= 0) return getSeedHeadID();
 
-        // Map the index to the visible node list, ensuring it stays within bounds[cite: 4]
+        // Map the index to the visible node list, ensuring it stays within bounds
         int anchorIndex = Math.min(caretPos, visibleNodes.size()) - 1;
 
-        // Safety check: if index is invalid, fall back to the seed[cite: 4]
+        // Safety check: if index is invalid, fall back to the seed
         if (anchorIndex < 0 || anchorIndex >= visibleNodes.size()) {
             return getSeedHeadID();
         }
 
-        // Return the unique ID for the character at that position[cite: 4]
+        // Return the unique ID for the character at that position
         return visibleNodes.get(anchorIndex).getCharID();
     }
 
@@ -389,7 +390,7 @@ class EditorDocumentController {
         int caret = host.textArea.getCaretPosition();
         rerender(caret, caret);
 
-        // 2. Explicitly refresh the comments sidebar to match the pruned state[cite: 5]
+        // 2. Explicitly refresh the comments sidebar to match the pruned state
         host.getCommentController().refreshCommentsSidebar();
 
         // 3. Synchronize collaboration UI components
@@ -404,7 +405,7 @@ class EditorDocumentController {
 
     void pasteWithFormatting(int replaceStart, int replaceEnd,
                             String text, List<boolean[]> snapshot) {
-        suppressUndoPush = true; // Prevents individual actions from creating multiple undo steps[cite: 4]
+        suppressUndoPush = true; // Prevents individual actions from creating multiple undo steps
         pendingUndoBatch.clear();
 
         try {
@@ -437,7 +438,7 @@ class EditorDocumentController {
         if (selection.getLength() == 0) return null;
 
         int start = selection.getStart();
-        int end = selection.getEnd(); // Exclusive index[cite: 4]
+        int end = selection.getEnd(); // Exclusive index
 
         List<boolean[]> snapshot = new ArrayList<>();
         for (int i = start; i < end && i < visibleNodes.size(); i++) {
@@ -454,7 +455,7 @@ class EditorDocumentController {
 
         int len = Math.min(insertEnd - insertStart, snapshot.size());
 
-        // Apply bold and italic runs separately[cite: 4]
+        // Apply bold and italic runs separately
         applyFormattingRuns(insertStart, len, snapshot, 0, "BOLD");
         applyFormattingRuns(insertStart, len, snapshot, 1, "ITALIC");
 
@@ -471,9 +472,9 @@ class EditorDocumentController {
         for (int i = 0; i <= len; i++) {
             boolean active = i < len && snapshot.get(i)[formatIndex];
             if (active && runStart == -1) {
-                runStart = i; // Start of a formatted run[cite: 4]
+                runStart = i; // Start of a formatted run
             } else if (!active && runStart != -1) {
-                // End of a run detected; create a single Action for the range[cite: 4]
+                // End of a run detected; create a single Action for the range
                 CharNode startNode = visibleNodes.get(insertStart + runStart);
                 CharNode endNode   = visibleNodes.get(insertStart + i - 1);
 
@@ -484,7 +485,7 @@ class EditorDocumentController {
                         endNode.getCharID(),
                         "true"
                 );
-                applyAndTrack(action); // Accumulates into the pending batch[cite: 4]
+                applyAndTrack(action); // Accumulates into the pending batch
                 runStart = -1;
             }
         }
