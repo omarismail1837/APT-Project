@@ -75,7 +75,7 @@ public class HelloApplication extends Application {
             return fromClasspath;
         }
 
-        // Fallback for IDE runs where resources are not copied to classpath output.
+        // fallback for IDE runs where resources are not copied to classpath output.
         Path fallback = Paths.get("Client", "src", "main", "resources", "App", "hello-view.fxml");
         if (Files.exists(fallback)) {
             return fallback.toUri().toURL();

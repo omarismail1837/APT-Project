@@ -82,7 +82,6 @@ class EditorDocumentController {
                 applyAndTrack(action);
             }
             refreshMapping();
-            // Pruning is now handled centrally in rerender()[cite: 4]
         }
         host.getPresenceController().setLastDeletionStart(idx);
 
@@ -305,6 +304,7 @@ class EditorDocumentController {
         return getSeedHeadID();
     }
 
+    // for commentcontroller
     CharNode getVisibleNode(int index) {
         if (index < 0 || index >= visibleNodes.size()) return null;
         return visibleNodes.get(index);
@@ -368,18 +368,17 @@ class EditorDocumentController {
         pendingUndoBatch.clear();
 
         try {
-            // 1. Perform the text replacement in the UI component[cite: 4]
             host.textArea.replaceText(replaceStart, replaceEnd, text);
         } finally {
             javafx.application.Platform.runLater(() -> {
                 try {
-                    // 2. Apply formatting — adds BOLD/ITALIC actions to the current pending batch[cite: 4]
+                    // 2. Apply formatting — adds BOLD/ITALIC actions to same batch
                     if (snapshot != null && !snapshot.isEmpty()) {
                         int insertEnd = replaceStart + text.length();
                         applyFormattingSnapshot(replaceStart, insertEnd, snapshot, false);
                     }
                 } finally {
-                    // 3. Finalize the batch and push it to the Undo Manager[cite: 4]
+                    // 3. Push the entire batch as ONE undo entry
                     suppressUndoPush = false;
                     if (!pendingUndoBatch.isEmpty()) {
                         undoRedoManager.pushUndo(new ArrayList<>(pendingUndoBatch));
@@ -387,7 +386,7 @@ class EditorDocumentController {
                         pendingUndoBatch.clear();
                     }
                     int caret = host.textArea.getCaretPosition();
-                    rerender(caret, caret); // Single rerender at the end for efficiency[cite: 4]
+                    rerender(caret, caret); // single rerender at the very end
                 }
             });
         }
@@ -431,7 +430,6 @@ class EditorDocumentController {
         int runStart = -1;
         for (int i = 0; i <= len; i++) {
             boolean active = i < len && snapshot.get(i)[formatIndex];
-
             if (active && runStart == -1) {
                 runStart = i; // Start of a formatted run[cite: 4]
             } else if (!active && runStart != -1) {
